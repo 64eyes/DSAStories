@@ -1,34 +1,56 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
+import { Routes, Route } from 'react-router-dom'
+import Navbar from './components/Navbar'
+import Home from './pages/Home'
+import Campaign from './pages/Campaign'
+import Arena from './pages/Arena'
+import Login from './pages/Login'
+import ChapterPlay from './pages/ChapterPlay'
 import './App.css'
 
-function App() {
-  const [count, setCount] = useState(0)
+const Leaderboard = () => (
+  <div className="rounded-xl border border-white/10 bg-white/5 p-6">
+    <h1 className="text-2xl font-bold text-white">Leaderboard</h1>
+    <p className="mt-2 text-gray-300">
+      Rankings placeholder. Show global, weekly, and nationality filters here.
+    </p>
+  </div>
+)
 
+function App() {
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <div className="min-h-screen bg-neutral-950 text-white">
+      <Navbar />
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <main className="mx-auto max-w-6xl px-4 pb-12 pt-24">
+              <Home />
+            </main>
+          }
+        />
+        <Route
+          path="/campaign"
+          element={
+            <main className="mx-auto max-w-6xl px-4 pb-12 pt-24">
+              <Campaign />
+            </main>
+          }
+        />
+        <Route path="/arena" element={<Arena />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/chapter/:chapterId" element={<ChapterPlay />} />
+        <Route path="/campaign/:chapterId" element={<ChapterPlay />} />
+        <Route
+          path="/leaderboard"
+          element={
+            <main className="mx-auto max-w-6xl px-4 pb-12 pt-24">
+              <Leaderboard />
+            </main>
+          }
+        />
+      </Routes>
+    </div>
   )
 }
 
