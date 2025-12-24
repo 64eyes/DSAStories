@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import Confetti from 'react-confetti'
 import { Check, Trophy } from 'lucide-react'
@@ -10,9 +11,23 @@ import { Check, Trophy } from 'lucide-react'
  * - isOpen: boolean
  * - onClose: () => void
  * - onNext: () => void
+ * - isSaving?: boolean
+ * - saveError?: string | null
+ * - progressSaved?: boolean
  * - xpGained?: number (default 50)
+ * - isGuest?: boolean (default false)
  */
-function LevelCompleteModal({ isOpen, onClose, onNext, xpGained = 50 }) {
+function LevelCompleteModal({
+  isOpen,
+  onClose,
+  onNext,
+  isSaving = false,
+  saveError = null,
+  progressSaved = false,
+  xpGained = 50,
+  isGuest = false,
+}) {
+  const navigate = useNavigate()
   const [displayXp, setDisplayXp] = useState(0)
 
   // Animate XP count-up when modal opens
@@ -40,6 +55,13 @@ function LevelCompleteModal({ isOpen, onClose, onNext, xpGained = 50 }) {
 
     return () => clearInterval(timer)
   }, [isOpen, xpGained])
+
+  // Analytics: Log guest level completion
+  useEffect(() => {
+    if (isOpen && isGuest) {
+      console.log('[Analytics] Guest user completed a level')
+    }
+  }, [isOpen, isGuest])
 
   // Placeholder: play success sound here when modal opens
   // useEffect(() => {
@@ -102,6 +124,36 @@ function LevelCompleteModal({ isOpen, onClose, onNext, xpGained = 50 }) {
                 </div>
               </div>
 
+              {/* Guest Mode Warning */}
+              {isGuest && (
+                <div className="mb-4 rounded-lg border border-yellow-500/50 bg-yellow-900/30 p-3 text-sm text-yellow-300">
+                  Your progress will be lost if you leave.
+                </div>
+              )}
+
+              {/* Saving Progress Indicator */}
+              {isSaving && (
+                <div className="mb-4 flex items-center justify-center gap-2 text-sm text-neutral-400">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />
+                  <span>Saving progress...</span>
+                </div>
+              )}
+
+              {/* Save Error */}
+              {saveError && (
+                <div className="mb-4 rounded-lg border border-red-500/50 bg-red-900/30 p-3 text-sm text-red-400">
+                  {saveError}
+                </div>
+              )}
+
+              {/* Progress Saved Success Message */}
+              {progressSaved && !isSaving && !isGuest && (
+                <div className="mb-4 flex items-center justify-center gap-2 text-sm text-emerald-400">
+                  <Check size={16} />
+                  <span>Progress saved!</span>
+                </div>
+              )}
+
               <div className="flex gap-3">
                 <button
                   type="button"
@@ -112,10 +164,21 @@ function LevelCompleteModal({ isOpen, onClose, onNext, xpGained = 50 }) {
                 </button>
                 <button
                   type="button"
-                  onClick={onNext}
-                  className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
+                  onClick={() => {
+                    if (isGuest) {
+                      navigate('/login')
+                    } else {
+                      onNext()
+                    }
+                  }}
+                  disabled={isSaving}
+                  className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors ${
+                    isSaving
+                      ? 'bg-neutral-700 cursor-not-allowed'
+                      : 'bg-emerald-600 hover:bg-emerald-700'
+                  }`}
                 >
-                  Next Chapter
+                  {isGuest ? 'Login to Save Progress' : isSaving ? 'Saving...' : 'Next Chapter'}
                 </button>
               </div>
             </motion.div>

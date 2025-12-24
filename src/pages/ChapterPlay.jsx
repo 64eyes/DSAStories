@@ -162,7 +162,9 @@ function ChapterPlay() {
       setSaveError(null)
       setProgressSaved(false)
 
+      // Check if user is logged in
       if (currentUser && currentUser.uid) {
+        // Logged in user - save progress
         setIsSaving(true)
         try {
           await unlockChapter(currentUser.uid, chapterId)
@@ -196,8 +198,8 @@ function ChapterPlay() {
           setIsSaving(false)
         }
       } else {
-        // Even if not logged in, mark as completed locally for this session
-        setIsChapterCompleted(true)
+        // Guest user - don't save progress, but still show success
+        setIsChapterCompleted(true) // Mark as completed locally for this session
       }
 
       setShowSuccessModal(true)
@@ -364,6 +366,7 @@ function ChapterPlay() {
         saveError={saveError}
         progressSaved={progressSaved}
         xpGained={50}
+        isGuest={!currentUser}
       />
 
       {/* New Region Unlocked Notification */}

@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useNavigate, useLocation } from 'react-router-dom'
-import { Lock, Play, Check } from 'lucide-react'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
+import { Lock, Play, Check, User, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { getUserProgress } from '../services/progress'
 
@@ -113,18 +113,29 @@ const statusStyles = {
   },
 }
 
-function CampaignNode({ region, onClick, index }) {
+function CampaignNode({ region, onClick, index, onLockedClick, isGuest }) {
   const styles = statusStyles[region.status] || statusStyles.locked
   const Icon = styles.icon
 
   const isClickable = region.status === 'active' || region.status === 'completed'
 
+  const handleClick = () => {
+    if (isClickable) {
+      onClick(region)
+    } else if (isGuest && region.id > 1) {
+      // Guest trying to access locked region
+      onLockedClick()
+    }
+  }
+
   return (
     <motion.button
-      className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-xl border px-4 py-3 text-left ${styles.bg} ${styles.border} ${styles.shadow} ${styles.opacity} backdrop-blur-md transition duration-200`}
+      className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-xl border px-4 py-3 text-left ${styles.bg} ${styles.border} ${styles.shadow} ${styles.opacity} backdrop-blur-md transition duration-200 ${
+        !isClickable && isGuest && region.id > 1 ? 'cursor-pointer' : ''
+      }`}
       style={{ left: `${region.position.x}%`, top: `${region.position.y}%` }}
-      onClick={() => isClickable && onClick(region)}
-      disabled={!isClickable}
+      onClick={handleClick}
+      disabled={!isClickable && !(isGuest && region.id > 1)}
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay: index * 0.08, type: 'spring', stiffness: 180, damping: 18 }}
@@ -243,10 +254,14 @@ function ChapterModal({ region, onClose, unlockedChapters = [] }) {
 function Campaign() {
   const { currentUser } = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
   const [selectedRegion, setSelectedRegion] = useState(null)
   const [regions, setRegions] = useState(REGIONS_BASE.map((r) => ({ ...r, status: 'locked' })))
   const [unlockedChapters, setUnlockedChapters] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [showLoginToast, setShowLoginToast] = useState(false)
+
+  const isGuest = !currentUser
 
   // Fetch user progress on mount and when navigating back to this page
   useEffect(() => {
@@ -319,8 +334,61 @@ function Campaign() {
     return regions.slice(0, -1).map((region, idx) => [region.position, regions[idx + 1].position])
   }, [regions])
 
+  const handleLockedRegionClick = () => {
+    setShowLoginToast(true)
+    setTimeout(() => setShowLoginToast(false), 4000)
+  }
+
   return (
     <div className="min-h-screen bg-neutral-950 text-white">
+      {/* Guest Mode Badge */}
+      {isGuest && (
+        <div className="mx-auto max-w-6xl px-4 pt-6">
+          <div className="flex items-center gap-2 rounded-lg border border-yellow-600/30 bg-yellow-600/10 px-4 py-2">
+            <User size={16} className="text-yellow-400" />
+            <span className="text-sm text-yellow-300">Guest Mode</span>
+            <span className="text-xs text-yellow-400/70">• Region 1 only</span>
+            <Link
+              to="/login"
+              className="ml-auto text-xs font-semibold text-yellow-400 underline hover:text-yellow-300"
+            >
+              Login to unlock all regions
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Login Required Toast */}
+      <AnimatePresence>
+        {showLoginToast && (
+          <motion.div
+            className="fixed top-6 left-1/2 z-50 -translate-x-1/2"
+            initial={{ opacity: 0, y: -20, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.9 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+          >
+            <div className="flex items-center gap-3 rounded-xl border border-yellow-500/50 bg-neutral-900 px-6 py-4 shadow-2xl">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-yellow-600">
+                <Lock size={20} className="text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-yellow-400">Login Required</p>
+                <p className="text-xs text-neutral-300">
+                  Login required to access advanced regions.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowLoginToast(false)}
+                className="ml-4 rounded-md px-2 py-1 text-xs text-neutral-400 transition hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="mx-auto max-w-6xl px-4 pb-16 pt-12">
         <header className="mb-10 space-y-2">
           <p className="text-xs uppercase tracking-[0.3em] text-red-600">Campaign / Constellation</p>
@@ -375,7 +443,14 @@ function Campaign() {
 
             {/* nodes */}
             {regions.map((region, idx) => (
-              <CampaignNode key={region.id} region={region} onClick={setSelectedRegion} index={idx} />
+              <CampaignNode
+                key={region.id}
+                region={region}
+                onClick={setSelectedRegion}
+                onLockedClick={handleLockedRegionClick}
+                isGuest={isGuest}
+                index={idx}
+              />
             ))}
           </div>
         </div>
