@@ -300,24 +300,24 @@ function MultiplayerArena({ roomId }) {
         )}
 
         {/* Header */}
-        <header className="flex items-center justify-between border-b border-white/10 bg-neutral-950/60 px-6 py-4 backdrop-blur-sm">
+        <header className="flex flex-col gap-2 border-b border-white/10 bg-neutral-950/60 px-4 py-3 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4">
           <div>
-            <h1 className="text-xl font-bold text-white">The Arena - Spectator View</h1>
+            <h1 className="text-lg font-bold text-white sm:text-xl">The Arena - Spectator View</h1>
             {chapter && (
               <p className="text-xs text-neutral-400">{chapter.title}</p>
             )}
           </div>
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-sm text-neutral-400">
-              <Users size={16} />
+            <div className="flex items-center gap-2 text-xs text-neutral-400 sm:text-sm">
+              <Users size={14} className="sm:w-4" />
               <span>{allPlayers.length} Players</span>
             </div>
           </div>
         </header>
 
         {/* 2x2 Grid of Player Editors */}
-        <div className="flex-1 overflow-auto p-6">
-          <div className="grid h-full grid-cols-2 gap-6">
+        <div className="flex-1 overflow-auto p-3 sm:p-6">
+          <div className="grid h-full grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-6">
             {playersToShow.map(([uid, player], index) => {
               const isWinner = winner && winner.uid === uid
               const isSuspicious = hasSuspiciousFlags(player)
@@ -407,25 +407,25 @@ function MultiplayerArena({ roomId }) {
       )}
 
       {/* Header */}
-      <header className="flex items-center justify-between border-b border-white/10 bg-neutral-950/60 px-6 py-4 backdrop-blur-sm">
+      <header className="flex flex-col gap-2 border-b border-white/10 bg-neutral-950/60 px-4 py-3 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4">
         <div>
-          <h1 className="text-xl font-bold text-white">The Arena</h1>
+          <h1 className="text-lg font-bold text-white sm:text-xl">The Arena</h1>
           {chapter && (
             <p className="text-xs text-neutral-400">{chapter.title}</p>
           )}
         </div>
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-sm text-neutral-400">
-            <Users size={16} />
+          <div className="flex items-center gap-2 text-xs text-neutral-400 sm:text-sm">
+            <Users size={14} className="sm:w-4" />
             <span>{allPlayers.length} Players</span>
           </div>
         </div>
       </header>
 
       {/* Main Content Grid */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
         {/* Main Area - Code Editor */}
-        <div className="flex-1 overflow-hidden p-6">
+        <div className="flex-1 overflow-hidden p-3 sm:p-6">
           <CodeEditor
             initialCode={chapter?.starterCode}
             onSuccess={handleSuccess}
@@ -437,7 +437,7 @@ function MultiplayerArena({ roomId }) {
         </div>
 
         {/* Sidebar - Opponents */}
-        <div className="w-80 border-l border-white/10 bg-neutral-900/30 p-4">
+        <div className="w-full border-t border-white/10 bg-neutral-900/30 p-3 lg:w-80 lg:border-l lg:border-t-0 lg:p-4">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-neutral-400">
             Opponents
           </h2>
@@ -453,7 +453,7 @@ function MultiplayerArena({ roomId }) {
                 return (
                   <motion.div
                     key={uid}
-                    className={`rounded-lg border p-3 transition-all ${
+                    className={`rounded-lg border p-2.5 transition-all sm:p-3 ${
                       isWinner
                         ? 'scale-105 border-yellow-500 bg-yellow-900/20 shadow-[0_0_20px_rgba(234,179,8,0.5)]'
                         : isDimmed
@@ -463,33 +463,33 @@ function MultiplayerArena({ roomId }) {
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: isDimmed ? 0.3 : 1, x: 0 }}
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 sm:gap-3">
                       <img
                         src={player.photoURL || '/default-avatar.png'}
                         alt={player.displayName || 'Player'}
-                        className="h-10 w-10 rounded-full border border-neutral-700 object-cover"
+                        className="h-8 w-8 flex-shrink-0 rounded-full border border-neutral-700 object-cover sm:h-10 sm:w-10"
                         onError={(e) => {
                           e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
                             player.displayName || 'Player',
                           )}&background=dc2626&color=fff&size=40`
                         }}
                       />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-semibold text-white">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 sm:gap-2">
+                          <p className="truncate text-xs font-semibold text-white sm:text-sm">
                             {player.displayName || 'Anonymous'}
                           </p>
                           {isSuspicious && (
-                            <AlertTriangle size={14} className="text-yellow-500" />
+                            <AlertTriangle size={12} className="flex-shrink-0 text-yellow-500 sm:w-3.5" />
                           )}
                           {isWinner && (
-                            <div className="ml-auto rounded bg-yellow-500/20 px-2 py-0.5">
-                              <span className="text-xs font-bold uppercase text-yellow-400">WINNER</span>
+                            <div className="ml-auto flex-shrink-0 rounded bg-yellow-500/20 px-1.5 py-0.5 sm:px-2">
+                              <span className="text-[10px] font-bold uppercase text-yellow-400 sm:text-xs">WINNER</span>
                             </div>
                           )}
                         </div>
                         <span
-                          className={`mt-1 inline-block rounded px-2 py-0.5 text-xs font-semibold ${getStatusBadgeColor(
+                          className={`mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold sm:px-2 sm:text-xs ${getStatusBadgeColor(
                             player.status || 'coding',
                           )}`}
                         >

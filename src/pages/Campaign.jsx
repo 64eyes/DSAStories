@@ -400,7 +400,7 @@ function Campaign() {
         </header>
 
         <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-neutral-900/30 px-4 py-10">
-          <div className="relative mx-auto h-[1400px] max-w-4xl">
+          <div className="relative mx-auto min-h-[600px] h-[1400px] max-w-4xl">
             {/* svg paths */}
             <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
               {lines.map(([a, b], idx) => (

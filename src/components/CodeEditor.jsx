@@ -260,7 +260,7 @@ function CodeEditor({ initialCode, onSuccess, onRunStart, onError, onCodeChange,
           <button
             onClick={handleRun}
             disabled={isLoading}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors active:scale-95 sm:px-4 ${
               isLoading
                 ? 'bg-neutral-700 text-neutral-400 cursor-not-allowed'
                 : 'bg-emerald-600 text-white hover:bg-emerald-700'
@@ -269,7 +269,7 @@ function CodeEditor({ initialCode, onSuccess, onRunStart, onError, onCodeChange,
             {isLoading ? (
               <>
                 <Loader2 size={16} className="animate-spin" />
-                <span>Running...</span>
+                <span className="hidden sm:inline">Running...</span>
               </>
             ) : (
               <>
@@ -294,19 +294,23 @@ function CodeEditor({ initialCode, onSuccess, onRunStart, onError, onCodeChange,
             onMount={handleEditorDidMount}
             options={{
               minimap: { enabled: false },
-              fontSize: 14,
+              fontSize: 12, // Smaller on mobile
               lineNumbers: 'on',
               scrollBeyondLastLine: false,
               automaticLayout: true,
               tabSize: 2,
               wordWrap: 'on',
               readOnly: readOnly,
+              // Mobile-friendly options
+              quickSuggestions: true,
+              suggestOnTriggerCharacters: true,
+              acceptSuggestionOnEnter: 'on',
             }}
           />
         </div>
 
         {/* Output Console */}
-        <div className="flex h-64 flex-col overflow-hidden bg-neutral-950 lg:h-auto lg:w-96">
+        <div className="flex h-48 flex-col overflow-hidden bg-neutral-950 sm:h-64 lg:h-auto lg:w-96">
           <div className="border-b border-white/10 bg-neutral-900/60 px-4 py-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
               Output

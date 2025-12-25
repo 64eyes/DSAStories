@@ -22,12 +22,12 @@ function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-neutral-950 px-4 py-12">
-      <div className="w-full max-w-md rounded-xl border border-neutral-800 bg-neutral-900 p-8 shadow-xl">
+    <div className="flex min-h-screen items-center justify-center bg-neutral-950 px-4 py-8 sm:py-12">
+      <div className="w-full max-w-md rounded-xl border border-neutral-800 bg-neutral-900 p-6 shadow-xl sm:p-8">
         <div className="space-y-6 text-center">
           <div className="space-y-2">
-            <h1 className="text-2xl font-bold text-white">Authentication Required</h1>
-            <p className="text-sm text-neutral-400">
+            <h1 className="text-xl font-bold text-white sm:text-2xl">Authentication Required</h1>
+            <p className="text-xs text-neutral-400 sm:text-sm">
               Sync your progress. Save your Elo. Join the leaderboard.
             </p>
           </div>
@@ -36,11 +36,11 @@ function Login() {
             <button
               onClick={handleGoogleSignIn}
               disabled={isLoading}
-              className="w-full rounded-lg bg-white px-6 py-4 text-base font-semibold text-black transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full rounded-lg bg-white px-5 py-3 text-sm font-semibold text-black transition-colors active:scale-95 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50 sm:px-6 sm:py-4 sm:text-base"
             >
               {isLoading ? (
                 <span className="flex items-center justify-center gap-2">
-                  <Loader2 size={18} className="animate-spin" />
+                  <Loader2 size={16} className="animate-spin sm:w-[18px]" />
                   <span>Signing in...</span>
                 </span>
               ) : (
@@ -50,7 +50,7 @@ function Login() {
           </div>
 
           {error && (
-            <p className="text-sm text-red-400">{error}</p>
+            <p className="text-xs text-red-400 sm:text-sm">{error}</p>
           )}
         </div>
       </div>

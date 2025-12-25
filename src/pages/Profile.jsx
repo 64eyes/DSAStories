@@ -221,16 +221,16 @@ function Profile() {
         {/* Two-Column Grid */}
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Left Column - Identity */}
-          <div className="rounded-xl border border-white/10 bg-neutral-900/30 p-6">
-            <h2 className="mb-6 text-lg font-semibold text-white">Identity</h2>
+          <div className="rounded-xl border border-white/10 bg-neutral-900/30 p-4 sm:p-6">
+            <h2 className="mb-4 text-base font-semibold text-white sm:mb-6 sm:text-lg">Identity</h2>
 
             {/* Avatar */}
-            <div className="mb-6 flex justify-center">
+            <div className="mb-4 flex justify-center sm:mb-6">
               <div className="relative">
                 <img
                   src={currentUser.photoURL || '/default-avatar.png'}
                   alt={currentUser.displayName || 'User'}
-                  className="h-32 w-32 rounded-full border-2 border-white/20 object-cover"
+                  className="h-24 w-24 rounded-full border-2 border-white/20 object-cover sm:h-32 sm:w-32"
                   onError={(e) => {
                     e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
                       currentUser.displayName || 'User',
@@ -241,9 +241,9 @@ function Profile() {
             </div>
 
             {/* Name */}
-            <div className="mb-6 text-center">
-              <div className="flex items-center justify-center gap-3">
-                <p className="text-xl font-semibold text-white">
+            <div className="mb-4 text-center sm:mb-6">
+              <div className="flex items-center justify-center gap-2 sm:gap-3">
+                <p className="text-lg font-semibold text-white sm:text-xl">
                   {currentUser.displayName || 'Anonymous Operative'}
                 </p>
                 {selectedNationality && (
@@ -278,17 +278,17 @@ function Profile() {
 
             {/* Nationality Selector */}
             <div>
-              <label className="mb-3 block text-sm font-semibold uppercase tracking-wider text-neutral-400">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-neutral-400 sm:mb-3 sm:text-sm">
                 Nationality
               </label>
               <div className="max-h-64 space-y-2 overflow-y-auto pr-2">
-                <div className="grid grid-cols-6 gap-2 sm:grid-cols-8 lg:grid-cols-6">
+                <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6 sm:gap-2 lg:grid-cols-6">
                   {NATIONALITIES.map((nat) => (
                     <button
                       key={nat.code}
                       onClick={() => handleNationalityChange(nat.code)}
                       disabled={saving}
-                      className={`relative flex items-center justify-center rounded-lg border p-2.5 transition-all ${
+                      className={`relative flex items-center justify-center rounded-lg border p-2 transition-all active:scale-95 sm:p-2.5 ${
                         selectedNationality === nat.code
                           ? 'border-red-600 bg-red-600/20 shadow-[0_0_15px_rgba(220,38,38,0.5)]'
                           : 'border-white/10 bg-neutral-800/60 hover:border-white/20 hover:bg-neutral-800/80'

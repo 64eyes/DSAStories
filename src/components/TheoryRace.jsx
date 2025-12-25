@@ -118,15 +118,15 @@ function TheoryRace({ roomId, roomData, onWinner }) {
   return (
     <div className="flex h-full flex-col bg-neutral-950 text-white">
       {/* Header with Score and Timer */}
-      <div className="border-b border-white/10 bg-neutral-900/60 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-6">
+      <div className="border-b border-white/10 bg-neutral-900/60 px-4 py-3 sm:px-6 sm:py-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3 sm:gap-6">
             <div>
               <div className="text-xs text-neutral-400">Your Score</div>
-              <div className="text-2xl font-bold text-emerald-400">{myScore} / {WINNING_SCORE}</div>
+              <div className="text-xl font-bold text-emerald-400 sm:text-2xl">{myScore} / {WINNING_SCORE}</div>
             </div>
-            <div className="h-12 w-px bg-white/10" />
-            <div>
+            <div className="hidden h-12 w-px bg-white/10 sm:block" />
+            <div className="hidden sm:block">
               <div className="text-xs text-neutral-400">Question</div>
               <div className="text-lg font-semibold text-white">
                 {currentQuestionIndex + 1} / {questions.length}
@@ -134,32 +134,36 @@ function TheoryRace({ roomId, roomData, onWinner }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Clock size={20} className="text-yellow-500" />
-            <span className={`text-xl font-mono font-bold ${timeRemaining <= 10 ? 'text-red-500' : 'text-white'}`}>
+            <Clock size={18} className="text-yellow-500 sm:w-5" />
+            <span className={`text-lg font-mono font-bold sm:text-xl ${timeRemaining <= 10 ? 'text-red-500' : 'text-white'}`}>
               {timeRemaining}s
             </span>
           </div>
         </div>
+        {/* Mobile Question Counter */}
+        <div className="mt-2 text-xs text-neutral-400 sm:hidden">
+          Question {currentQuestionIndex + 1} / {questions.length}
+        </div>
       </div>
 
       {/* Question Card */}
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6">
         <motion.div
           key={currentQuestionIndex}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="mx-auto max-w-3xl"
         >
-          <div className="rounded-xl border border-white/10 bg-neutral-900 p-8">
-            <h2 className="mb-6 text-2xl font-bold text-white">{currentQuestion.question}</h2>
+          <div className="rounded-xl border border-white/10 bg-neutral-900 p-4 sm:p-8">
+            <h2 className="mb-4 text-lg font-bold text-white sm:mb-6 sm:text-2xl">{currentQuestion.question}</h2>
 
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               {currentQuestion.options.map((option, index) => {
                 const isSelected = selectedAnswer === index
                 const isCorrect = index === correctAnswerIndex
                 const showResult = showFeedback
 
-                let buttonClass = 'w-full rounded-lg border p-4 text-left transition-all'
+                let buttonClass = 'w-full rounded-lg border p-3 text-left transition-all active:scale-95 sm:p-4'
                 if (showResult) {
                   if (isCorrect) {
                     buttonClass += ' border-emerald-500 bg-emerald-900/30 text-emerald-300'
@@ -181,12 +185,12 @@ function TheoryRace({ roomId, roomData, onWinner }) {
                     disabled={showFeedback || isSubmitting}
                     className={buttonClass}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">{option}</span>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium sm:text-base">{option}</span>
                       {showResult && (
                         <>
-                          {isCorrect && <CheckCircle2 size={20} className="text-emerald-500" />}
-                          {isSelected && !isCorrect && <XCircle size={20} className="text-red-500" />}
+                          {isCorrect && <CheckCircle2 size={18} className="flex-shrink-0 text-emerald-500 sm:w-5" />}
+                          {isSelected && !isCorrect && <XCircle size={18} className="flex-shrink-0 text-red-500 sm:w-5" />}
                         </>
                       )}
                     </div>
@@ -200,16 +204,16 @@ function TheoryRace({ roomId, roomData, onWinner }) {
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mt-6 rounded-lg border p-4"
+                className="mt-4 rounded-lg border p-3 sm:mt-6 sm:p-4"
                 style={{
                   borderColor: selectedAnswer === correctAnswerIndex ? 'rgba(16, 185, 129, 0.5)' : 'rgba(239, 68, 68, 0.5)',
                   backgroundColor: selectedAnswer === correctAnswerIndex ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
                 }}
               >
-                <p className={`font-semibold ${selectedAnswer === correctAnswerIndex ? 'text-emerald-400' : 'text-red-400'}`}>
+                <p className={`text-sm font-semibold sm:text-base ${selectedAnswer === correctAnswerIndex ? 'text-emerald-400' : 'text-red-400'}`}>
                   {selectedAnswer === correctAnswerIndex ? '✓ Correct!' : '✗ Incorrect'}
                 </p>
-                <p className="mt-2 text-sm text-neutral-300">{currentQuestion.explanation}</p>
+                <p className="mt-2 text-xs text-neutral-300 sm:text-sm">{currentQuestion.explanation}</p>
               </motion.div>
             )}
           </div>
@@ -217,11 +221,11 @@ function TheoryRace({ roomId, roomData, onWinner }) {
       </div>
 
       {/* Leaderboard Sidebar */}
-      <div className="w-80 border-l border-white/10 bg-neutral-900/30 p-4">
-        <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-neutral-400">
+      <div className="w-full border-t border-white/10 bg-neutral-900/30 p-4 lg:w-80 lg:border-l lg:border-t-0">
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-400 sm:mb-4 sm:text-sm">
           Leaderboard
         </h3>
-        <div className="space-y-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-1 sm:space-y-2 lg:grid-cols-1">
           {Object.entries(playerScores)
             .sort(([, a], [, b]) => b - a)
             .map(([uid, score], index) => {
@@ -232,7 +236,7 @@ function TheoryRace({ roomId, roomData, onWinner }) {
               return (
                 <div
                   key={uid}
-                  className={`rounded-lg border p-3 ${
+                  className={`rounded-lg border p-2 sm:p-3 ${
                     isWinner
                       ? 'border-yellow-500 bg-yellow-900/20'
                       : isMe
@@ -240,27 +244,28 @@ function TheoryRace({ roomId, roomData, onWinner }) {
                       : 'border-neutral-800 bg-neutral-800/60'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between gap-1 sm:gap-2">
+                    <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
                       <span className="text-xs font-bold text-neutral-400">#{index + 1}</span>
                       <img
                         src={player?.photoURL || '/default-avatar.png'}
                         alt={player?.displayName || 'Player'}
-                        className="h-8 w-8 rounded-full border border-neutral-700 object-cover"
+                        className="h-6 w-6 flex-shrink-0 rounded-full border border-neutral-700 object-cover sm:h-8 sm:w-8"
                         onError={(e) => {
                           e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
                             player?.displayName || 'Player',
                           )}&background=dc2626&color=fff&size=32`
                         }}
                       />
-                      <span className="text-sm font-semibold text-white">
-                        {player?.displayName || 'Anonymous'}
-                        {isMe && ' (You)'}
+                      <span className="truncate text-xs font-semibold text-white sm:text-sm">
+                        <span className="hidden sm:inline">{player?.displayName || 'Anonymous'}</span>
+                        <span className="sm:hidden">{player?.displayName?.split(' ')[0] || 'Anon'}</span>
+                        {isMe && <span className="hidden sm:inline"> (You)</span>}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {isWinner && <Trophy size={16} className="text-yellow-500" />}
-                      <span className={`font-bold ${isWinner ? 'text-yellow-400' : 'text-white'}`}>
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      {isWinner && <Trophy size={14} className="flex-shrink-0 text-yellow-500 sm:w-4" />}
+                      <span className={`text-sm font-bold sm:text-base ${isWinner ? 'text-yellow-400' : 'text-white'}`}>
                         {score}
                       </span>
                     </div>
