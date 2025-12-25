@@ -2,9 +2,12 @@ import { Routes, Route } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import Home from './pages/Home'
 import Campaign from './pages/Campaign'
-import Arena from './pages/Arena'
 import Login from './pages/Login'
 import ChapterPlay from './pages/ChapterPlay'
+import Profile from './pages/Profile'
+import Lobby from './pages/Lobby'
+import Arena from './pages/Arena'
+import ProtectedRoute from './components/ProtectedRoute'
 import './App.css'
 
 const Leaderboard = () => (
@@ -37,16 +40,41 @@ function App() {
             </main>
           }
         />
-        <Route path="/arena" element={<Arena />} />
+        <Route
+          path="/arena/:roomId?"
+          element={
+            <ProtectedRoute>
+              <Arena />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/lobby"
+          element={
+            <ProtectedRoute>
+              <Lobby />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/login" element={<Login />} />
         <Route path="/chapter/:chapterId" element={<ChapterPlay />} />
         <Route path="/campaign/:chapterId" element={<ChapterPlay />} />
         <Route
           path="/leaderboard"
           element={
-            <main className="mx-auto max-w-6xl px-4 pb-12 pt-24">
-              <Leaderboard />
-            </main>
+            <ProtectedRoute>
+              <main className="mx-auto max-w-6xl px-4 pb-12 pt-24">
+                <Leaderboard />
+              </main>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <Profile />
+            </ProtectedRoute>
           }
         />
       </Routes>

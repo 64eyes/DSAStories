@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Editor from '@monaco-editor/react'
 import { Play, Loader2 } from 'lucide-react'
 import { executeCode } from '../services/judge0'
@@ -14,12 +14,15 @@ int main() {
     return 0;
 }`
 
-function CodeEditor({ initialCode, onSuccess }) {
+function CodeEditor({ initialCode, onSuccess, onRunStart, onError, onCodeChange, onSuspiciousActivity, readOnly = false }) {
   const [code, setCode] = useState(initialCode || DEFAULT_CODE)
   const [output, setOutput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isError, setIsError] = useState(false)
   const [stats, setStats] = useState(null)
+  const [showPasteWarning, setShowPasteWarning] = useState(false)
+  const editorRef = useRef(null)
+  const debounceTimerRef = useRef(null)
 
   // Reset editor code when initialCode changes (e.g., navigating to next chapter)
   useEffect(() => {
@@ -30,11 +33,73 @@ function CodeEditor({ initialCode, onSuccess }) {
     setStats(null)
   }, [initialCode])
 
+  // Debounced code change handler
+  const debouncedCodeChange = useCallback((newCode) => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      if (onCodeChange && typeof onCodeChange === 'function') {
+        onCodeChange(newCode)
+      }
+    }, 500)
+  }, [onCodeChange])
+
+  // Handle code changes
+  const handleCodeChange = (value) => {
+    const newCode = value || ''
+    setCode(newCode)
+    
+    // Broadcast code changes (debounced) if not read-only
+    if (!readOnly && onCodeChange) {
+      debouncedCodeChange(newCode)
+    }
+  }
+
+  // Handle Monaco editor mount
+  const handleEditorDidMount = (editor, monaco) => {
+    editorRef.current = editor
+
+    // Add paste detection listener
+    if (!readOnly) {
+      editor.onDidPaste((e) => {
+        const pastedText = e.text || ''
+        const pastedLength = pastedText.length
+
+        // If pasted content is longer than 20 characters, flag as suspicious
+        if (pastedLength > 20) {
+          // Visual warning: flash red border
+          setShowPasteWarning(true)
+          setTimeout(() => setShowPasteWarning(false), 2000)
+
+          // Call suspicious activity callback
+          if (onSuspiciousActivity && typeof onSuspiciousActivity === 'function') {
+            onSuspiciousActivity('paste')
+          }
+        }
+      })
+    }
+  }
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+    }
+  }, [])
+
   const handleRun = async () => {
     setIsLoading(true)
     setIsError(false)
     setOutput('')
     setStats(null)
+
+    // Call onRunStart callback if provided
+    if (onRunStart && typeof onRunStart === 'function') {
+      onRunStart()
+    }
 
     try {
       const result = await executeCode(code)
@@ -64,12 +129,19 @@ function CodeEditor({ initialCode, onSuccess }) {
           errorMsg = `${statusDescription}\n\n${errorMsg}`
         }
         setOutput(errorMsg)
+        // Call onError callback if provided
+        if (onError && typeof onError === 'function') {
+          onError(errorMsg)
+        }
       } else if (status === 5) {
         // Time Limit Exceeded
         setIsError(true)
-        setOutput(
-          `⏱️ Time Limit Exceeded\n\nYour program exceeded the time limit.\n${statusDescription || 'Execution was terminated due to timeout.'}`,
-        )
+        const errorMsg = `⏱️ Time Limit Exceeded\n\nYour program exceeded the time limit.\n${statusDescription || 'Execution was terminated due to timeout.'}`
+        setOutput(errorMsg)
+        // Call onError callback if provided
+        if (onError && typeof onError === 'function') {
+          onError(errorMsg)
+        }
       } else if (status === 7 || status === 8 || status === 9) {
         // Runtime Errors (SIGSEGV, NZEC, Other)
         setIsError(true)
@@ -96,18 +168,36 @@ function CodeEditor({ initialCode, onSuccess }) {
         }
 
         setOutput(errorMsg)
+        // Call onError callback if provided
+        if (onError && typeof onError === 'function') {
+          onError(errorMsg)
+        }
       } else if (status === 10) {
         // Internal Error
         setIsError(true)
-        setOutput(`⚠️ Internal Error\n\n${statusDescription || 'An internal error occurred. Please try again.'}`)
+        const errorMsg = `⚠️ Internal Error\n\n${statusDescription || 'An internal error occurred. Please try again.'}`
+        setOutput(errorMsg)
+        // Call onError callback if provided
+        if (onError && typeof onError === 'function') {
+          onError(errorMsg)
+        }
       } else if (status === 11) {
         // Exec Format Error
         setIsError(true)
-        setOutput(`⚠️ Execution Format Error\n\n${statusDescription || 'Invalid executable format.'}`)
+        const errorMsg = `⚠️ Execution Format Error\n\n${statusDescription || 'Invalid executable format.'}`
+        setOutput(errorMsg)
+        // Call onError callback if provided
+        if (onError && typeof onError === 'function') {
+          onError(errorMsg)
+        }
       } else if (result.stderr) {
         // Other stderr output (treat as error)
         setIsError(true)
         setOutput(result.stderr)
+        // Call onError callback if provided
+        if (onError && typeof onError === 'function') {
+          onError(result.stderr)
+        }
       } else if (result.stdout !== null && result.stdout !== undefined) {
         // Success - stdout (can be empty string, which is valid)
         setIsError(false)
@@ -132,46 +222,63 @@ function CodeEditor({ initialCode, onSuccess }) {
       } else {
         // Unknown status or no output
         setIsError(true)
-        setOutput(
-          statusDescription || `Unknown status: ${status}\nNo output received from the program.`,
-        )
+        const errorMsg = statusDescription || `Unknown status: ${status}\nNo output received from the program.`
+        setOutput(errorMsg)
+        // Call onError callback if provided
+        if (onError && typeof onError === 'function') {
+          onError(errorMsg)
+        }
       }
     } catch (error) {
       setIsError(true)
-      setOutput(error.message || 'Failed to execute code')
+      const errorMsg = error.message || 'Failed to execute code'
+      setOutput(errorMsg)
+      // Call onError callback if provided
+      if (onError && typeof onError === 'function') {
+        onError(errorMsg)
+      }
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-white/10 bg-neutral-900">
+    <div className={`flex h-full flex-col overflow-hidden rounded-xl border transition-all ${
+      showPasteWarning 
+        ? 'border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.5)]' 
+        : 'border-white/10'
+    } ${readOnly ? 'bg-neutral-900/50' : 'bg-neutral-900'}`}>
       {/* Toolbar */}
       <div className="flex items-center justify-between border-b border-white/10 bg-neutral-950/60 px-4 py-3">
         <div className="flex items-center gap-3">
           <span className="text-sm font-mono text-neutral-400">main.cpp</span>
-        </div>
-        <button
-          onClick={handleRun}
-          disabled={isLoading}
-          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-            isLoading
-              ? 'bg-neutral-700 text-neutral-400 cursor-not-allowed'
-              : 'bg-emerald-600 text-white hover:bg-emerald-700'
-          }`}
-        >
-          {isLoading ? (
-            <>
-              <Loader2 size={16} className="animate-spin" />
-              <span>Running...</span>
-            </>
-          ) : (
-            <>
-              <Play size={16} />
-              <span>Run</span>
-            </>
+          {readOnly && (
+            <span className="text-xs text-neutral-500">(Read-Only)</span>
           )}
-        </button>
+        </div>
+        {!readOnly && (
+          <button
+            onClick={handleRun}
+            disabled={isLoading}
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+              isLoading
+                ? 'bg-neutral-700 text-neutral-400 cursor-not-allowed'
+                : 'bg-emerald-600 text-white hover:bg-emerald-700'
+            }`}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                <span>Running...</span>
+              </>
+            ) : (
+              <>
+                <Play size={16} />
+                <span>Run</span>
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Editor and Output Container */}
@@ -183,7 +290,8 @@ function CodeEditor({ initialCode, onSuccess }) {
             language="cpp"
             theme="vs-dark"
             value={code}
-            onChange={(value) => setCode(value || '')}
+            onChange={handleCodeChange}
+            onMount={handleEditorDidMount}
             options={{
               minimap: { enabled: false },
               fontSize: 14,
@@ -192,6 +300,7 @@ function CodeEditor({ initialCode, onSuccess }) {
               automaticLayout: true,
               tabSize: 2,
               wordWrap: 'on',
+              readOnly: readOnly,
             }}
           />
         </div>

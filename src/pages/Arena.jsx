@@ -1,24 +1,21 @@
-import { Share2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { AnimatePresence, motion } from 'framer-motion'
+import { Users, AlertTriangle, RotateCcw, Home } from 'lucide-react'
+import Confetti from 'react-confetti'
 import CodeEditor from '../components/CodeEditor'
+import TheoryRace from '../components/TheoryRace'
+import { useAuth } from '../contexts/AuthContext'
+import { subscribeToRoom, updatePlayerStatus, updatePlayerCode, flagSuspiciousActivity, resetMatch } from '../services/multiplayer'
+import { CHAPTER_CONTENT } from '../data/chapterContent'
 
-function Arena() {
-  const handleShareRoom = () => {
-    // Dummy function for now
-    alert('Share Room functionality coming soon!')
-  }
-
+// Solo Mode (no roomId)
+function SoloArena() {
   return (
     <div className="flex h-screen flex-col bg-neutral-950 text-white">
       {/* Minimalist Header */}
       <header className="flex items-center justify-between border-b border-white/10 bg-neutral-950/60 px-6 py-4 backdrop-blur-sm">
         <h1 className="text-xl font-bold text-white">The Arena</h1>
-        <button
-          onClick={handleShareRoom}
-          className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition-colors hover:border-white/25 hover:bg-white/10"
-        >
-          <Share2 size={16} />
-          <span>Share Room</span>
-        </button>
       </header>
 
       {/* Code Editor Container */}
@@ -31,5 +28,507 @@ function Arena() {
   )
 }
 
-export default Arena
+// Multiplayer Mode (with roomId)
+function MultiplayerArena({ roomId }) {
+  const { currentUser } = useAuth()
+  const navigate = useNavigate()
+  const [roomData, setRoomData] = useState(null)
+  const [winner, setWinner] = useState(null)
+  const [showConfetti, setShowConfetti] = useState(false)
+  const [showPostMatch, setShowPostMatch] = useState(false)
 
+  // Subscribe to room updates
+  useEffect(() => {
+    if (!roomId) return
+
+    const unsubscribe = subscribeToRoom(roomId, (data) => {
+      if (data === null) {
+        setRoomData(null)
+        return
+      }
+
+      setRoomData(data)
+
+      // Check for winner based on match type
+      if (data.players) {
+        const players = Object.entries(data.players)
+        
+        if (data.matchType === 'theory') {
+          // Theory race: winner is first to 10 correct answers
+          const winnerPlayer = players.find(([uid, player]) => (player.correctAnswers || 0) >= 10)
+          if (winnerPlayer && !winner) {
+            const [winnerUid, winnerData] = winnerPlayer
+            setWinner({
+              uid: winnerUid,
+              ...winnerData,
+            })
+            setShowConfetti(true)
+            setShowPostMatch(true)
+            setTimeout(() => setShowConfetti(false), 5000)
+          }
+        } else {
+          // Coding challenge: winner is first to success
+          const winnerPlayer = players.find(([uid, player]) => player.status === 'success')
+          if (winnerPlayer && !winner) {
+            const [winnerUid, winnerData] = winnerPlayer
+            setWinner({
+              uid: winnerUid,
+              ...winnerData,
+            })
+            setShowConfetti(true)
+            setShowPostMatch(true)
+            setTimeout(() => setShowConfetti(false), 5000)
+          }
+        }
+      }
+    })
+
+    return () => {
+      unsubscribe()
+    }
+  }, [roomId, winner])
+
+  // Get chapter data for the problem
+  const problemId = roomData?.currentProblemId || '1-20'
+  const chapter = CHAPTER_CONTENT[problemId]
+
+  // Determine if current user is a player
+  const isPlayer = currentUser?.uid && roomData?.players?.[currentUser.uid] ? true : false
+
+  // Get all players
+  const allPlayers = roomData?.players ? Object.entries(roomData.players) : []
+
+  // Get opponents (filter out current user)
+  const opponents = allPlayers.filter(([uid]) => uid !== currentUser?.uid)
+
+  // Get current player data
+  const currentPlayer = currentUser?.uid && roomData?.players?.[currentUser.uid]
+    ? roomData.players[currentUser.uid]
+    : null
+
+  const handleRunStart = async () => {
+    if (!roomId || !currentUser?.uid) return
+    try {
+      await updatePlayerStatus(roomId, currentUser.uid, 'compiling')
+    } catch (error) {
+      console.error('Failed to update player status:', error)
+    }
+  }
+
+  const handleSuccess = async () => {
+    if (!roomId || !currentUser?.uid) return
+    try {
+      await updatePlayerStatus(roomId, currentUser.uid, 'success')
+    } catch (error) {
+      console.error('Failed to update player status:', error)
+    }
+  }
+
+  const handleError = async () => {
+    if (!roomId || !currentUser?.uid) return
+    try {
+      await updatePlayerStatus(roomId, currentUser.uid, 'failed')
+    } catch (error) {
+      console.error('Failed to update player status:', error)
+    }
+  }
+
+  const handleCodeChange = async (code) => {
+    if (!roomId || !currentUser?.uid) return
+    try {
+      await updatePlayerCode(roomId, currentUser.uid, code)
+    } catch (error) {
+      console.error('Failed to update player code:', error)
+    }
+  }
+
+  const handleSuspiciousActivity = async (type) => {
+    if (!roomId || !currentUser?.uid) return
+    try {
+      const flagMessage = type === 'paste' ? 'Paste Detected' : type
+      await flagSuspiciousActivity(roomId, currentUser.uid, flagMessage)
+    } catch (error) {
+      console.error('Failed to flag suspicious activity:', error)
+    }
+  }
+
+  const getStatusBadgeColor = (status) => {
+    switch (status) {
+      case 'success':
+        return 'bg-emerald-600 text-white'
+      case 'compiling':
+        return 'bg-yellow-600 text-white'
+      case 'failed':
+        return 'bg-red-600 text-white'
+      case 'coding':
+      default:
+        return 'bg-neutral-700 text-neutral-300'
+    }
+  }
+
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case 'success':
+        return 'Success'
+      case 'compiling':
+        return 'Compiling'
+      case 'failed':
+        return 'Failed'
+      case 'coding':
+      default:
+        return 'Coding'
+    }
+  }
+
+  const hasSuspiciousFlags = (player) => {
+    if (!player.flags) return false
+    // Check if flags object contains "Paste Detected" or similar
+    const flags = typeof player.flags === 'object' ? Object.values(player.flags) : []
+    return flags.some(flag => flag && flag.toString().includes('Paste'))
+  }
+
+  const handleNextChallenge = async () => {
+    // Reset match state
+    try {
+      await resetMatch(roomId)
+      setWinner(null)
+      setShowPostMatch(false)
+      // Room will reset to 'waiting' status, which will trigger navigation back to lobby
+    } catch (error) {
+      console.error('Failed to reset match:', error)
+    }
+  }
+
+  const handleReturnToLobby = () => {
+    navigate(`/lobby`)
+  }
+
+  if (!roomData) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-neutral-950 text-white">
+        <div className="text-center">
+          <p className="text-neutral-400">Loading room data...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Post-Match Screen
+  if (showPostMatch && winner) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center bg-neutral-950 text-white">
+        {showConfetti && (
+          <Confetti
+            width={window.innerWidth}
+            height={window.innerHeight}
+            recycle={false}
+            numberOfPieces={500}
+          />
+        )}
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="w-full max-w-2xl rounded-2xl border border-yellow-500/50 bg-neutral-900 p-8 text-center shadow-2xl"
+        >
+          <h1 className="mb-4 text-4xl font-bold text-yellow-400">Match Complete!</h1>
+          <p className="mb-8 text-xl text-neutral-300">
+            {winner.uid === currentUser?.uid
+              ? '🎉 Congratulations! You won!'
+              : `${winner.displayName || 'A player'} won the match!`}
+          </p>
+          
+          <div className="mb-8 flex justify-center gap-4">
+            <button
+              onClick={handleNextChallenge}
+              className="flex items-center gap-2 rounded-lg bg-yellow-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-yellow-700"
+            >
+              <RotateCcw size={20} />
+              <span>Next Challenge</span>
+            </button>
+            <button
+              onClick={handleReturnToLobby}
+              className="flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-800 px-6 py-3 font-semibold text-white transition-colors hover:bg-neutral-700"
+            >
+              <Home size={20} />
+              <span>Return to Lobby</span>
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    )
+  }
+
+  // Theory Race Mode
+  if (roomData.matchType === 'theory') {
+    return (
+      <div className="flex h-screen flex-col bg-neutral-950 text-white">
+        {showConfetti && (
+          <Confetti
+            width={window.innerWidth}
+            height={window.innerHeight}
+            recycle={false}
+            numberOfPieces={500}
+          />
+        )}
+        <TheoryRace
+          roomId={roomId}
+          roomData={roomData}
+          onWinner={(winnerData) => {
+            setWinner(winnerData)
+            setShowPostMatch(true)
+          }}
+        />
+      </div>
+    )
+  }
+
+  // SPECTATOR VIEW: 2x2 Grid
+  if (!isPlayer) {
+    // Take first 4 players for the grid
+    const playersToShow = allPlayers.slice(0, 4)
+    
+    return (
+      <div className="flex h-screen flex-col bg-neutral-950 text-white">
+        {/* Confetti */}
+        {showConfetti && (
+          <Confetti
+            width={window.innerWidth}
+            height={window.innerHeight}
+            recycle={false}
+            numberOfPieces={500}
+          />
+        )}
+
+        {/* Header */}
+        <header className="flex items-center justify-between border-b border-white/10 bg-neutral-950/60 px-6 py-4 backdrop-blur-sm">
+          <div>
+            <h1 className="text-xl font-bold text-white">The Arena - Spectator View</h1>
+            {chapter && (
+              <p className="text-xs text-neutral-400">{chapter.title}</p>
+            )}
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 text-sm text-neutral-400">
+              <Users size={16} />
+              <span>{allPlayers.length} Players</span>
+            </div>
+          </div>
+        </header>
+
+        {/* 2x2 Grid of Player Editors */}
+        <div className="flex-1 overflow-auto p-6">
+          <div className="grid h-full grid-cols-2 gap-6">
+            {playersToShow.map(([uid, player], index) => {
+              const isWinner = winner && winner.uid === uid
+              const isSuspicious = hasSuspiciousFlags(player)
+              const isDimmed = winner && !isWinner
+
+              return (
+                <motion.div
+                  key={uid}
+                  className={`relative flex flex-col overflow-hidden rounded-xl border transition-all ${
+                    isWinner
+                      ? 'scale-105 border-yellow-500 shadow-[0_0_30px_rgba(234,179,8,0.5)]'
+                      : isDimmed
+                      ? 'border-white/10 opacity-30 grayscale'
+                      : 'border-white/10'
+                  }`}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: isDimmed ? 0.3 : 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                >
+                  {/* Player Header */}
+                  <div className={`flex items-center justify-between border-b border-white/10 bg-neutral-900/60 px-4 py-3 ${
+                    isWinner ? 'bg-yellow-900/30' : ''
+                  }`}>
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={player.photoURL || '/default-avatar.png'}
+                        alt={player.displayName || 'Player'}
+                        className="h-8 w-8 rounded-full border border-neutral-700 object-cover"
+                        onError={(e) => {
+                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                            player.displayName || 'Player',
+                          )}&background=dc2626&color=fff&size=32`
+                        }}
+                      />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-white">
+                            {player.displayName || 'Anonymous'}
+                          </p>
+                          {isSuspicious && (
+                            <AlertTriangle size={16} className="text-yellow-500" />
+                          )}
+                        </div>
+                        <span
+                          className={`mt-1 inline-block rounded px-2 py-0.5 text-xs font-semibold ${getStatusBadgeColor(
+                            player.status || 'coding',
+                          )}`}
+                        >
+                          {getStatusLabel(player.status || 'coding')}
+                        </span>
+                      </div>
+                    </div>
+                    {isWinner && (
+                      <div className="rounded-lg bg-yellow-500/20 px-3 py-1">
+                        <span className="text-xs font-bold uppercase text-yellow-400">VICTORY</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Code Editor (Read-Only) */}
+                  <div className="flex-1 overflow-hidden">
+                    <CodeEditor
+                      initialCode={player.code || chapter?.starterCode || ''}
+                      readOnly={true}
+                    />
+                  </div>
+                </motion.div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // PLAYER VIEW: Split Layout
+  return (
+    <div className="flex h-screen flex-col bg-neutral-950 text-white">
+      {/* Confetti */}
+      {showConfetti && (
+        <Confetti
+          width={window.innerWidth}
+          height={window.innerHeight}
+          recycle={false}
+          numberOfPieces={500}
+        />
+      )}
+
+      {/* Header */}
+      <header className="flex items-center justify-between border-b border-white/10 bg-neutral-950/60 px-6 py-4 backdrop-blur-sm">
+        <div>
+          <h1 className="text-xl font-bold text-white">The Arena</h1>
+          {chapter && (
+            <p className="text-xs text-neutral-400">{chapter.title}</p>
+          )}
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 text-sm text-neutral-400">
+            <Users size={16} />
+            <span>{allPlayers.length} Players</span>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content Grid */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Main Area - Code Editor */}
+        <div className="flex-1 overflow-hidden p-6">
+          <CodeEditor
+            initialCode={chapter?.starterCode}
+            onSuccess={handleSuccess}
+            onRunStart={handleRunStart}
+            onError={handleError}
+            onCodeChange={handleCodeChange}
+            onSuspiciousActivity={handleSuspiciousActivity}
+          />
+        </div>
+
+        {/* Sidebar - Opponents */}
+        <div className="w-80 border-l border-white/10 bg-neutral-900/30 p-4">
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-neutral-400">
+            Opponents
+          </h2>
+          {opponents.length === 0 ? (
+            <p className="text-sm text-neutral-500">No other players in the room</p>
+          ) : (
+            <div className="space-y-3">
+              {opponents.map(([uid, player]) => {
+                const isWinner = winner && winner.uid === uid
+                const isSuspicious = hasSuspiciousFlags(player)
+                const isDimmed = winner && !isWinner
+
+                return (
+                  <motion.div
+                    key={uid}
+                    className={`rounded-lg border p-3 transition-all ${
+                      isWinner
+                        ? 'scale-105 border-yellow-500 bg-yellow-900/20 shadow-[0_0_20px_rgba(234,179,8,0.5)]'
+                        : isDimmed
+                        ? 'border-neutral-800 bg-neutral-800/30 opacity-30 grayscale'
+                        : 'border-neutral-800 bg-neutral-800/60'
+                    }`}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: isDimmed ? 0.3 : 1, x: 0 }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={player.photoURL || '/default-avatar.png'}
+                        alt={player.displayName || 'Player'}
+                        className="h-10 w-10 rounded-full border border-neutral-700 object-cover"
+                        onError={(e) => {
+                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                            player.displayName || 'Player',
+                          )}&background=dc2626&color=fff&size=40`
+                        }}
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-white">
+                            {player.displayName || 'Anonymous'}
+                          </p>
+                          {isSuspicious && (
+                            <AlertTriangle size={14} className="text-yellow-500" />
+                          )}
+                          {isWinner && (
+                            <div className="ml-auto rounded bg-yellow-500/20 px-2 py-0.5">
+                              <span className="text-xs font-bold uppercase text-yellow-400">WINNER</span>
+                            </div>
+                          )}
+                        </div>
+                        <span
+                          className={`mt-1 inline-block rounded px-2 py-0.5 text-xs font-semibold ${getStatusBadgeColor(
+                            player.status || 'coding',
+                          )}`}
+                        >
+                          {getStatusLabel(player.status || 'coding')}
+                        </span>
+                      </div>
+                    </div>
+                    {player.progress !== undefined && (
+                      <div className="mt-2">
+                        <div className="h-1 w-full overflow-hidden rounded-full bg-neutral-700">
+                          <div
+                            className="h-full bg-emerald-600 transition-all duration-300"
+                            style={{ width: `${player.progress}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Main Arena Component
+function Arena() {
+  const { roomId } = useParams()
+
+  // If no roomId, show solo mode
+  if (!roomId) {
+    return <SoloArena />
+  }
+
+  // If roomId exists, show multiplayer mode
+  return <MultiplayerArena roomId={roomId} />
+}
+
+export default Arena
