@@ -6,7 +6,7 @@ import { logOut } from '../services/firebase'
 
 const navItems = [
   { to: '/campaign', label: 'Campaign', icon: Map },
-  { to: '/arena', label: 'Arena', icon: Crosshair },
+  { to: '/lobby', label: 'Arena', icon: Crosshair },
   { to: '/leaderboard', label: 'Leaderboard', icon: BarChart3 },
 ]
 
