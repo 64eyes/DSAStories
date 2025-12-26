@@ -181,12 +181,21 @@ function TheoryRace({ roomId, roomData, onWinner, isSpectator = false }) {
   }, [roomData, onWinner, showFeedback, winCondition, currentUser?.uid])
 
   // Timer: Set targetTime when question changes (only for players)
+  // Use a ref to track the last question index to prevent reset when roomData updates
+  const lastQuestionIndexRef = useRef(currentQuestionIndex)
+  
   useEffect(() => {
+    // Only reset timer if the current user's question index actually changed
+    // This prevents timer reset when other players update their question index
     if (isPlayer && currentQuestionIndex < questions.length && !showFeedback) {
-      // Set target time to 30 seconds from now
-      const target = Date.now() + 30000
-      setTargetTime(target)
-      timeoutHandledRef.current = false // Reset timeout flag for new question
+      // Only reset if this is a new question for the current user
+      if (lastQuestionIndexRef.current !== currentQuestionIndex) {
+        // Set target time to 30 seconds from now
+        const target = Date.now() + 30000
+        setTargetTime(target)
+        timeoutHandledRef.current = false // Reset timeout flag for new question
+        lastQuestionIndexRef.current = currentQuestionIndex // Update ref
+      }
     }
   }, [isPlayer, currentQuestionIndex, questions.length, showFeedback])
 

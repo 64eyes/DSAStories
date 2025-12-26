@@ -269,9 +269,12 @@ function MultiplayerArena({ roomId }) {
   // Theory Race Mode
   if (roomData.matchType === 'theory') {
     // Theory race view (handles both players and spectators)
+    // Only show confetti for spectators when there's a winner, or in post-match screen
+    const shouldShowConfetti = (isSpectator && winner) || (showPostMatch && winner)
+    
     return (
       <div className="flex h-screen flex-col bg-neutral-950 text-white">
-        {showConfetti && (
+        {shouldShowConfetti && (
           <Confetti
             width={window.innerWidth}
             height={window.innerHeight}
@@ -285,7 +288,10 @@ function MultiplayerArena({ roomId }) {
           isSpectator={isSpectator}
           onWinner={(winnerData) => {
             setWinner(winnerData)
-            setShowConfetti(true)
+            // Only set confetti if current user is the winner or is a spectator
+            if (winnerData.uid === currentUser?.uid || isSpectator) {
+              setShowConfetti(true)
+            }
             setShowPostMatch(true)
             setTimeout(() => setShowConfetti(false), 5000)
           }}
@@ -299,10 +305,13 @@ function MultiplayerArena({ roomId }) {
     // Take first 4 players for the grid
     const playersToShow = allPlayers.slice(0, 4)
     
+    // Only show confetti for spectators when there's a winner
+    const shouldShowConfetti = isSpectator && winner && showConfetti
+    
     return (
       <div className="flex h-screen flex-col bg-neutral-950 text-white">
-        {/* Confetti */}
-        {showConfetti && (
+        {/* Confetti - only for spectators when winner is declared */}
+        {shouldShowConfetti && (
           <Confetti
             width={window.innerWidth}
             height={window.innerHeight}
@@ -429,17 +438,9 @@ function MultiplayerArena({ roomId }) {
   }
 
   // PLAYER VIEW: Split Layout
+  // Only show confetti in post-match screen, not during gameplay
   return (
     <div className="flex h-screen flex-col bg-neutral-950 text-white">
-      {/* Confetti */}
-      {showConfetti && (
-        <Confetti
-          width={window.innerWidth}
-          height={window.innerHeight}
-          recycle={false}
-          numberOfPieces={500}
-        />
-      )}
 
       {/* Header */}
       <header className="flex flex-col gap-2 border-b border-white/10 bg-neutral-950/60 px-4 py-3 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4">
