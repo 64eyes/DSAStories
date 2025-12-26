@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowRight, Map, Crosshair, Trophy } from 'lucide-react'
 import CodeRain from '../components/CodeRain'
@@ -39,6 +40,7 @@ const getGridPosition = (index) => {
 }
 
 function Home() {
+  const navigate = useNavigate()
   const [ordered, setOrdered] = useState(false)
 
   const floatingBadges = useMemo(
@@ -153,8 +155,8 @@ function Home() {
           </p>
 
           <div className="flex flex-col items-center justify-center gap-4 sm:flex-row sm:gap-6">
-            <motion.a
-              href="/campaign"
+            <motion.button
+              onClick={() => navigate('/campaign')}
               className="group relative w-full max-w-xs overflow-hidden rounded-xl bg-red-600 px-6 py-4 text-center text-lg font-semibold text-white shadow-[0_0_30px_rgba(220,38,38,0.45)] transition duration-200 hover:shadow-[0_0_40px_rgba(220,38,38,0.55)]"
               whileHover={{ scale: 1.02 }}
               onMouseEnter={() => setOrdered(true)}
@@ -163,10 +165,10 @@ function Home() {
             >
               <span className="relative z-10">Start The Campaign</span>
               <span className="absolute inset-0 bg-red-600/20 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
-            </motion.a>
+            </motion.button>
 
-            <motion.a
-              href="/arena"
+            <motion.button
+              onClick={() => navigate('/lobby')}
               aria-label="Enter Arena - Quick Match"
               className="group w-full max-w-xs rounded-xl border border-white/15 bg-white/5 px-6 py-4 text-center text-lg font-semibold text-white transition duration-200 hover:border-red-400/50 hover:bg-white/10"
               onMouseEnter={() => setOrdered(true)}
@@ -181,7 +183,7 @@ function Home() {
               <p className="mt-1 text-xs uppercase tracking-[0.25em] text-red-300/80">
                 Enter Arena
               </p>
-            </motion.a>
+            </motion.button>
           </div>
         </motion.div>
 
