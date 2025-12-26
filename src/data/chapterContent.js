@@ -81,8 +81,8 @@ The sensor array requires user input to calibrate. The input stream is not prope
 
 Without proper input handling, the system cannot receive configuration parameters from the operator.
 
-**Your Mission:** Read an integer from input and print it back with the message "Received: [value]".`,
-    objective: 'Read an integer from input and display it',
+**Your Mission:** Read an integer from input and print it back with the message "Received: [value]" where [value] is the integer you read. The program should work with any integer input value.`,
+    objective: 'Read an integer from input and display it in the format "Received: [value]"',
     starterCode: `#include <iostream>
 
 int main() {
@@ -257,8 +257,8 @@ The security system requires single-character input for access codes. The system
 
 Character types are essential for single-byte data. Using the wrong type causes input parsing failures.
 
-**Your Mission:** Read a character from input and print it with the message "Code: [character]".`,
-    objective: 'Read and display a character value',
+**Your Mission:** Read a character from input and print it with the message "Code: [character]" where [character] is the character you read. The program should work with any character input.`,
+    objective: 'Read and display a character value in the format "Code: [character]"',
     starterCode: `#include <iostream>
 
 int main() {
@@ -460,8 +460,8 @@ The data stream must be processed until it reaches the end marker (value 0). The
 
 While loops handle condition-based repetition. The system must continue processing until the termination condition is met.
 
-**Your Mission:** Use a while loop to read integers and sum them until you read 0, then print the sum.`,
-    objective: 'Use a while loop for condition-based repetition',
+**Your Mission:** Use a while loop to read integers and sum them until you read 0, then print the sum. The program should work with any sequence of integers ending with 0.`,
+    objective: 'Use a while loop to read and sum integers until 0 is encountered',
     starterCode: `#include <iostream>
 
 int main() {

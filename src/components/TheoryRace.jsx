@@ -148,45 +148,6 @@ function TheoryRace({ roomId, roomData, onWinner }) {
       return () => clearInterval(timer)
     }
   }, [endTime, showFeedback, currentQuestionIndex, questions.length, handleAnswerSelect])
-    if (isSubmitting || showFeedback) return
-
-    const question = questions[currentQuestionIndex]
-    if (!question) return
-
-    setIsSubmitting(true)
-    setSelectedAnswer(answerIndex)
-    setCorrectAnswerIndex(question.correct)
-    setShowFeedback(true)
-
-    const isCorrect = answerIndex === question.correct
-
-    // Submit answer to Firebase
-    if (roomId && currentUser?.uid) {
-      try {
-        await submitTheoryAnswer(
-          roomId,
-          currentUser.uid,
-          question.id,
-          answerIndex !== null ? answerIndex : -1,
-          isCorrect,
-        )
-      } catch (error) {
-        console.error('Failed to submit answer:', error)
-      }
-    }
-
-    // Move to next question after 2 seconds
-    setTimeout(() => {
-      if (currentQuestionIndex < questions.length - 1) {
-        setCurrentQuestionIndex(currentQuestionIndex + 1)
-        setSelectedAnswer(null)
-        setShowFeedback(false)
-        setCorrectAnswerIndex(null)
-        // endTime will be reset by the useEffect when currentQuestionIndex changes
-      }
-      setIsSubmitting(false)
-    }, 2000)
-  }
 
   if (questions.length === 0) {
     return (

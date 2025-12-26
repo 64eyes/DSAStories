@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Copy, Check, Plus, Play, Code, BookOpen } from 'lucide-react'
+import { Copy, Check, Plus, Play, Code, BookOpen, Eye } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { createRoom, joinRoom, subscribeToRoom, startMatch } from '../services/multiplayer'
 import { getCategories } from '../data/theoryQuestions'
@@ -83,7 +83,7 @@ function Lobby() {
     }
   }
 
-  const handleJoinRoom = async () => {
+  const handleJoinRoom = async (role = 'player') => {
     if (!currentUser) {
       setError('You must be logged in to join a room')
       return
@@ -98,14 +98,23 @@ function Lobby() {
     setError(null)
 
     try {
-      const result = await joinRoom(joinRoomId.trim().toUpperCase(), currentUser)
+      const result = await joinRoom(joinRoomId.trim().toUpperCase(), currentUser, role)
 
       if (!result.success) {
         setError('Failed to join room')
         return
       }
 
-      setRoomId(joinRoomId.trim().toUpperCase())
+      const roomIdToSet = joinRoomId.trim().toUpperCase()
+      setRoomId(roomIdToSet)
+      
+      // If joining as spectator, navigate directly to arena
+      if (result.role === 'spectator') {
+        navigate(`/arena/${roomIdToSet}`, { 
+          state: { role: 'spectator' },
+          replace: true 
+        })
+      }
     } catch (err) {
       console.error('Failed to join room:', err)
       setError(err.message || 'Failed to join room')
@@ -163,6 +172,8 @@ function Lobby() {
 
   const isHost = roomData && currentUser && roomData.hostId === currentUser.uid
   const playerCount = roomData?.players ? Object.keys(roomData.players).length : 0
+  const spectatorCount = roomData?.spectators ? Object.keys(roomData.spectators).length : 0
+  const isSpectator = currentUser?.uid && roomData?.spectators?.[currentUser.uid] && !roomData?.players?.[currentUser.uid]
   const canStart = isHost && playerCount >= 2
 
   // Debug logging
@@ -187,10 +198,20 @@ function Lobby() {
   // State B: Waiting Room
   if (roomId && roomData) {
     const players = roomData.players ? Object.entries(roomData.players) : []
+    const spectators = roomData.spectators ? Object.entries(roomData.spectators) : []
 
     return (
       <div className="flex min-h-screen flex-col bg-neutral-950 text-white">
         <div className="mx-auto w-full max-w-4xl px-4 pb-12 pt-20 sm:pt-24">
+          {/* Spectator Banner */}
+          {isSpectator && (
+            <div className="mb-6 rounded-lg border border-yellow-500/50 bg-yellow-900/20 p-4 text-center">
+              <p className="text-sm font-semibold text-yellow-400">
+                👁️ You are spectating this match. You will be able to watch when the match starts.
+              </p>
+            </div>
+          )}
+
           {/* Room Code Display */}
           <div className="mb-6 text-center sm:mb-8">
             <label className="mb-3 block text-xs font-semibold uppercase tracking-wider text-neutral-400 sm:mb-4">
@@ -218,7 +239,7 @@ function Lobby() {
 
           {/* Players Grid */}
           <div className="mb-8 rounded-xl border border-neutral-800 bg-neutral-900 p-6">
-            <h2 className="mb-4 text-lg font-semibold text-white">Players</h2>
+            <h2 className="mb-4 text-lg font-semibold text-white">Players ({playerCount})</h2>
             {players.length === 0 ? (
               <p className="text-center text-sm text-neutral-500">No players yet...</p>
             ) : (
@@ -258,6 +279,40 @@ function Lobby() {
               </div>
             )}
           </div>
+
+          {/* Spectators Grid */}
+          {spectators.length > 0 && (
+            <div className="mb-8 rounded-xl border border-neutral-800 bg-neutral-900 p-6">
+              <h2 className="mb-4 text-lg font-semibold text-white">Spectators ({spectatorCount})</h2>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {spectators.map(([uid, spectator]) => (
+                  <div
+                    key={uid}
+                    className="flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-800/40 p-4 opacity-75"
+                  >
+                    <img
+                      src={spectator.photoURL || '/default-avatar.png'}
+                      alt={spectator.displayName || 'Spectator'}
+                      className="h-12 w-12 rounded-full border border-neutral-700 object-cover"
+                      onError={(e) => {
+                        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                          spectator.displayName || 'Spectator',
+                        )}&background=6b7280&color=fff&size=48`
+                      }}
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-neutral-300">
+                          {spectator.displayName || 'Anonymous'}
+                        </p>
+                        <span className="text-xs text-neutral-500">👁️</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
               {/* Match Type Selection (Host Only) */}
               {isHost && (
@@ -331,7 +386,13 @@ function Lobby() {
 
           {/* Action Section */}
           <div className="text-center">
-            {isHost ? (
+            {isSpectator ? (
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-lg font-semibold text-yellow-400">
+                  👁️ You are spectating. The match will begin when the host starts it.
+                </span>
+              </div>
+            ) : isHost ? (
               <div>
                 <button
                   onClick={handleStartMatch}
@@ -416,21 +477,36 @@ function Lobby() {
                     className="w-full rounded-lg border border-neutral-800 bg-neutral-800 px-4 py-3 font-mono text-center text-xl tracking-widest text-white placeholder:text-neutral-600 focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-600/20 disabled:cursor-not-allowed disabled:opacity-50 sm:px-6 sm:py-4 sm:text-2xl"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !isJoining && currentUser && joinRoomId.length === 6) {
-                        handleJoinRoom()
+                        handleJoinRoom('player')
                       }
                     }}
                   />
-                  <button
-                    onClick={handleJoinRoom}
-                    disabled={isJoining || !currentUser || joinRoomId.length !== 6}
-                    className={`w-full rounded-lg px-4 py-3 text-sm font-semibold text-white transition-colors active:scale-95 sm:px-6 sm:text-base ${
-                      isJoining || !currentUser || joinRoomId.length !== 6
-                        ? 'bg-neutral-700 text-neutral-400 cursor-not-allowed'
-                        : 'bg-red-600 hover:bg-red-700'
-                    }`}
-                  >
-                    {isJoining ? 'Joining...' : 'Join'}
-                  </button>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <button
+                      onClick={() => handleJoinRoom('player')}
+                      disabled={isJoining || !currentUser || joinRoomId.length !== 6}
+                      className={`flex items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold text-white transition-colors active:scale-95 sm:px-6 sm:text-base ${
+                        isJoining || !currentUser || joinRoomId.length !== 6
+                          ? 'bg-neutral-700 text-neutral-400 cursor-not-allowed'
+                          : 'bg-red-600 hover:bg-red-700'
+                      }`}
+                    >
+                      <Play size={16} className="sm:w-5" />
+                      <span>{isJoining ? 'Joining...' : 'Join Match'}</span>
+                    </button>
+                    <button
+                      onClick={() => handleJoinRoom('spectator')}
+                      disabled={isJoining || !currentUser || joinRoomId.length !== 6}
+                      className={`flex items-center justify-center gap-2 rounded-lg border-2 px-4 py-3 text-sm font-semibold transition-colors active:scale-95 sm:px-6 sm:text-base ${
+                        isJoining || !currentUser || joinRoomId.length !== 6
+                          ? 'border-neutral-700 bg-neutral-800/50 text-neutral-500 cursor-not-allowed'
+                          : 'border-neutral-600 bg-neutral-800/50 text-neutral-300 hover:border-neutral-500 hover:bg-neutral-800 hover:text-white'
+                      }`}
+                    >
+                      <Eye size={16} className="sm:w-5" />
+                      <span>{isJoining ? 'Joining...' : 'Spectate'}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
         </div>

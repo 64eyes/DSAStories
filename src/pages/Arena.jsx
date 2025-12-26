@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Users, AlertTriangle, RotateCcw, Home } from 'lucide-react'
 import Confetti from 'react-confetti'
@@ -32,10 +32,14 @@ function SoloArena() {
 function MultiplayerArena({ roomId }) {
   const { currentUser } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [roomData, setRoomData] = useState(null)
   const [winner, setWinner] = useState(null)
   const [showConfetti, setShowConfetti] = useState(false)
   const [showPostMatch, setShowPostMatch] = useState(false)
+  
+  // Get role from navigation state or determine from room data
+  const roleFromState = location.state?.role
 
   // Subscribe to room updates
   useEffect(() => {
@@ -44,6 +48,8 @@ function MultiplayerArena({ roomId }) {
     const unsubscribe = subscribeToRoom(roomId, (data) => {
       if (data === null) {
         setRoomData(null)
+        // If room is deleted, navigate back to lobby
+        navigate('/lobby', { replace: true })
         return
       }
 
@@ -92,8 +98,10 @@ function MultiplayerArena({ roomId }) {
   const problemId = roomData?.currentProblemId || '1-20'
   const chapter = CHAPTER_CONTENT[problemId]
 
-  // Determine if current user is a player
-  const isPlayer = currentUser?.uid && roomData?.players?.[currentUser.uid] ? true : false
+  // Determine role: check navigation state first, then room data
+  const isSpectator = roleFromState === 'spectator' || 
+    (currentUser?.uid && roomData?.spectators?.[currentUser.uid] && !roomData?.players?.[currentUser.uid])
+  const isPlayer = !isSpectator && currentUser?.uid && roomData?.players?.[currentUser.uid] ? true : false
 
   // Get all players
   const allPlayers = roomData?.players ? Object.entries(roomData.players) : []
@@ -260,6 +268,108 @@ function MultiplayerArena({ roomId }) {
 
   // Theory Race Mode
   if (roomData.matchType === 'theory') {
+    // If spectator, show spectator view for theory race
+    if (isSpectator) {
+      return (
+        <div className="flex h-screen flex-col bg-neutral-950 text-white">
+          {showConfetti && (
+            <Confetti
+              width={window.innerWidth}
+              height={window.innerHeight}
+              recycle={false}
+              numberOfPieces={500}
+            />
+          )}
+          {/* Header */}
+          <header className="flex flex-col gap-2 border-b border-white/10 bg-neutral-950/60 px-4 py-3 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4">
+            <div>
+              <h1 className="text-lg font-bold text-white sm:text-xl">Theory Race - Spectator View</h1>
+              <p className="mt-1 text-xs font-semibold text-yellow-400">👁️ You are watching</p>
+              {roomData?.currentProblemId && (
+                <p className="text-xs text-neutral-400">Category: {roomData.currentProblemId}</p>
+              )}
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 text-xs text-neutral-400 sm:text-sm">
+                <Users size={14} className="sm:w-4" />
+                <span>{allPlayers.length} Players</span>
+                {roomData?.spectators && Object.keys(roomData.spectators).length > 0 && (
+                  <span className="text-neutral-500">• {Object.keys(roomData.spectators).length} Spectators</span>
+                )}
+              </div>
+            </div>
+          </header>
+          
+          {/* Spectator Leaderboard */}
+          <div className="flex-1 overflow-auto p-4 sm:p-6">
+            <div className="mx-auto max-w-2xl">
+              <h2 className="mb-4 text-lg font-semibold text-white">Live Leaderboard</h2>
+              {allPlayers.length === 0 ? (
+                <p className="text-center text-neutral-500">No players in the match</p>
+              ) : (
+                <div className="space-y-3">
+                  {allPlayers
+                    .sort(([, a], [, b]) => {
+                      const scoreA = a.correctAnswers || 0
+                      const scoreB = b.correctAnswers || 0
+                      if (scoreB !== scoreA) return scoreB - scoreA
+                      // Tie-breaker: earlier lastCorrectAt wins
+                      const timeA = a.lastCorrectAt || 0
+                      const timeB = b.lastCorrectAt || 0
+                      return timeA - timeB
+                    })
+                    .map(([uid, player], index) => {
+                      const isWinner = (player.correctAnswers || 0) >= (roomData.winCondition || 10)
+                      return (
+                        <motion.div
+                          key={uid}
+                          className={`rounded-lg border p-4 ${
+                            isWinner
+                              ? 'border-yellow-500 bg-yellow-900/20'
+                              : 'border-neutral-800 bg-neutral-800/60'
+                          }`}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <span className="text-lg font-bold text-neutral-400">#{index + 1}</span>
+                              <img
+                                src={player.photoURL || '/default-avatar.png'}
+                                alt={player.displayName || 'Player'}
+                                className="h-10 w-10 rounded-full border border-neutral-700 object-cover"
+                                onError={(e) => {
+                                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                    player.displayName || 'Player',
+                                  )}&background=dc2626&color=fff&size=40`
+                                }}
+                              />
+                              <div>
+                                <p className="font-semibold text-white">{player.displayName || 'Anonymous'}</p>
+                                <p className="text-sm text-neutral-400">
+                                  Score: {player.correctAnswers || 0} / {roomData.winCondition || 10}
+                                </p>
+                              </div>
+                            </div>
+                            {isWinner && (
+                              <div className="rounded-lg bg-yellow-500/20 px-3 py-1">
+                                <span className="text-xs font-bold uppercase text-yellow-400">WINNER</span>
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      )
+                    })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )
+    }
+    
+    // Player view for theory race
     return (
       <div className="flex h-screen flex-col bg-neutral-950 text-white">
         {showConfetti && (
@@ -282,8 +392,8 @@ function MultiplayerArena({ roomId }) {
     )
   }
 
-  // SPECTATOR VIEW: 2x2 Grid
-  if (!isPlayer) {
+  // SPECTATOR VIEW: 2x2 Grid (for spectators or non-players)
+  if (isSpectator || !isPlayer) {
     // Take first 4 players for the grid
     const playersToShow = allPlayers.slice(0, 4)
     
@@ -303,14 +413,23 @@ function MultiplayerArena({ roomId }) {
         <header className="flex flex-col gap-2 border-b border-white/10 bg-neutral-950/60 px-4 py-3 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4">
           <div>
             <h1 className="text-lg font-bold text-white sm:text-xl">The Arena - Spectator View</h1>
+            {isSpectator && (
+              <p className="mt-1 text-xs font-semibold text-yellow-400">👁️ You are watching</p>
+            )}
             {chapter && (
               <p className="text-xs text-neutral-400">{chapter.title}</p>
+            )}
+            {roomData?.matchType === 'theory' && roomData?.currentProblemId && (
+              <p className="text-xs text-neutral-400">Theory Race: {roomData.currentProblemId}</p>
             )}
           </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 text-xs text-neutral-400 sm:text-sm">
               <Users size={14} className="sm:w-4" />
               <span>{allPlayers.length} Players</span>
+              {roomData?.spectators && Object.keys(roomData.spectators).length > 0 && (
+                <span className="text-neutral-500">• {Object.keys(roomData.spectators).length} Spectators</span>
+              )}
             </div>
           </div>
         </header>
@@ -379,10 +498,24 @@ function MultiplayerArena({ roomId }) {
 
                   {/* Code Editor (Read-Only) */}
                   <div className="flex-1 overflow-hidden">
-                    <CodeEditor
-                      initialCode={player.code || chapter?.starterCode || ''}
-                      readOnly={true}
-                    />
+                    {roomData?.matchType === 'coding' && (
+                      <CodeEditor
+                        initialCode={player.code || chapter?.starterCode || ''}
+                        readOnly={true}
+                      />
+                    )}
+                    {roomData?.matchType === 'theory' && (
+                      <div className="flex h-full items-center justify-center bg-neutral-900/50 p-4">
+                        <p className="text-center text-neutral-400">
+                          {player.displayName || 'Player'} is in a Theory Race.
+                          {player.correctAnswers !== undefined && (
+                            <span className="block mt-2 text-emerald-400 font-semibold">
+                              Score: {player.correctAnswers} / {roomData.winCondition || 10}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               )

@@ -83,16 +83,21 @@ export async function createRoom(hostUser) {
  * Join an existing room
  * @param {string} roomId - The room ID to join
  * @param {Object} user - The Firebase user object joining the room
- * @returns {Promise<{success: boolean}>}
+ * @param {string} role - The role: 'player' or 'spectator' (default: 'player')
+ * @returns {Promise<{success: boolean, role: string}>}
  * @throws {Error} - If room doesn't exist or join fails
  */
-export async function joinRoom(roomId, user) {
+export async function joinRoom(roomId, user, role = 'player') {
   if (!rtdb) {
     throw new Error('Realtime Database is not initialized. Please check your Firebase configuration.')
   }
 
   if (!roomId || !user || !user.uid) {
     throw new Error('roomId and user with uid are required')
+  }
+
+  if (role !== 'player' && role !== 'spectator') {
+    throw new Error('role must be either "player" or "spectator"')
   }
 
   try {
@@ -105,15 +110,33 @@ export async function joinRoom(roomId, user) {
       throw new Error('Room does not exist')
     }
 
-    // Add user to players object
-    const playerRef = ref(rtdb, `rooms/${roomId}/players/${user.uid}`)
-    await set(playerRef, {
-      displayName: user.displayName || 'Anonymous',
-      photoURL: user.photoURL || '',
-      score: 0,
-    })
+    if (role === 'spectator') {
+      // Add user to spectators object
+      const spectatorRef = ref(rtdb, `rooms/${roomId}/spectators/${user.uid}`)
+      await set(spectatorRef, {
+        displayName: user.displayName || 'Anonymous',
+        photoURL: user.photoURL || '',
+        joinedAt: Date.now(),
+      })
 
-    return { success: true }
+      return { success: true, role: 'spectator' }
+    } else {
+      // Add user to players object (existing logic)
+      const playerRef = ref(rtdb, `rooms/${roomId}/players/${user.uid}`)
+      await set(playerRef, {
+        displayName: user.displayName || 'Anonymous',
+        photoURL: user.photoURL || '',
+        score: 0,
+        status: 'coding',
+        code: '',
+        progress: 0,
+        flags: [],
+        correctAnswers: 0,
+        theoryAnswers: {},
+      })
+
+      return { success: true, role: 'player' }
+    }
   } catch (error) {
     console.error('Error joining room:', error)
     throw new Error(`Failed to join room: ${error.message}`)
