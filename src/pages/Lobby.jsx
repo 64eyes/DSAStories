@@ -18,7 +18,7 @@ function Lobby() {
   const [error, setError] = useState(null)
   const [copied, setCopied] = useState(false)
   const [matchType, setMatchType] = useState('coding') // 'coding' or 'theory'
-  const [theoryCategory, setTheoryCategory] = useState('cpp-foundations')
+  const [theoryCategory, setTheoryCategory] = useState('cpp')
 
   // If roomId comes from URL, set it
   useEffect(() => {
