@@ -14,7 +14,7 @@ int main() {
     return 0;
 }`
 
-function CodeEditor({ initialCode, onSuccess, onRunStart, onError, onCodeChange, onSuspiciousActivity, readOnly = false }) {
+function CodeEditor({ initialCode, onSuccess, onRunStart, onError, onCodeChange, onSuspiciousActivity, readOnly = false, testCaseInput = '' }) {
   const [code, setCode] = useState(initialCode || DEFAULT_CODE)
   const [output, setOutput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -102,7 +102,7 @@ function CodeEditor({ initialCode, onSuccess, onRunStart, onError, onCodeChange,
     }
 
     try {
-      const result = await executeCode(code)
+      const result = await executeCode(code, testCaseInput)
 
       // Judge0 status codes:
       // 1: In Queue, 2: Processing, 3: Accepted, 4: Wrong Answer

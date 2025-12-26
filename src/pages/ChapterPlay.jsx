@@ -353,6 +353,7 @@ function ChapterPlay() {
           <CodeEditorWithStarterCode
             starterCode={chapter.starterCode}
             onSuccess={handleCodeSuccess}
+            testCaseInput={chapter.testCaseInput || ''}
           />
         </div>
       </div>
@@ -485,8 +486,8 @@ function ChapterPlay() {
 }
 
 // Wrapper component to pass starterCode to CodeEditor
-function CodeEditorWithStarterCode({ starterCode, onSuccess }) {
-  return <CodeEditor initialCode={starterCode} onSuccess={onSuccess} />
+function CodeEditorWithStarterCode({ starterCode, onSuccess, testCaseInput }) {
+  return <CodeEditor initialCode={starterCode} onSuccess={onSuccess} testCaseInput={testCaseInput} />
 }
 
 export default ChapterPlay

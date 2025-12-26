@@ -9,10 +9,11 @@ const C_PLUS_PLUS_LANGUAGE_ID = 54 // C++ GCC 9.2.0
 /**
  * Executes C++ code using Judge0 API
  * @param {string} sourceCode - The C++ source code to execute
+ * @param {string} stdin - Optional input to be passed to the program (default: empty string)
  * @returns {Promise<Object>} - The submission result with execution details
  * @throws {Error} - If API key is missing or request fails
  */
-export async function executeCode(sourceCode) {
+export async function executeCode(sourceCode, stdin = '') {
   const apiKey = import.meta.env.VITE_RAPIDAPI_KEY
 
   if (!apiKey) {
@@ -24,7 +25,7 @@ export async function executeCode(sourceCode) {
   try {
     // Encode source code to base64
     const encodedSourceCode = btoa(unescape(encodeURIComponent(sourceCode)))
-    const encodedStdin = btoa('')
+    const encodedStdin = btoa(unescape(encodeURIComponent(stdin)))
 
     // Use base64_encoded=true as required by Judge0
     const url = `${JUDGE0_API_URL}?base64_encoded=true&fields=*&wait=true`
