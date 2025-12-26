@@ -3,7 +3,7 @@
  * Handles real-time multiplayer game rooms using Firebase Realtime Database
  */
 
-import { ref, set, get, onValue, update, push, child } from 'firebase/database'
+import { ref, set, get, onValue, update, push, child, serverTimestamp } from 'firebase/database'
 import { rtdb } from './firebase'
 
 /**
@@ -125,10 +125,11 @@ export async function joinRoom(roomId, user) {
  * @param {string} roomId - The room ID
  * @param {string} problemId - The problem/chapter ID (e.g., "1-20") or category for theory race
  * @param {string} matchType - The match type: "coding" or "theory"
+ * @param {number} questionCount - Optional: Number of questions for theory race (used to set winCondition)
  * @returns {Promise<void>}
  * @throws {Error} - If room doesn't exist or start fails
  */
-export async function startMatch(roomId, problemId, matchType = 'coding') {
+export async function startMatch(roomId, problemId, matchType = 'coding', questionCount = null) {
   if (!rtdb) {
     throw new Error('Realtime Database is not initialized. Please check your Firebase configuration.')
   }
@@ -155,13 +156,21 @@ export async function startMatch(roomId, problemId, matchType = 'coding') {
       status: 'playing',
       matchType: matchType,
       currentProblemId: problemId,
-      startTime: Date.now(),
+      startTime: serverTimestamp(), // Use server timestamp for sync across all clients
     }
     
-    // For theory race, initialize question tracking
+    // For theory race, initialize question tracking and set win condition
     if (matchType === 'theory') {
       updateData.currentQuestionIndex = 0
       updateData.questionsAnswered = {}
+      
+      // Set win condition: first to 10 correct answers, or total questions if less than 10
+      if (questionCount && questionCount > 0) {
+        updateData.winCondition = Math.min(10, questionCount)
+      } else {
+        // Default to 10 if questionCount not provided
+        updateData.winCondition = 10
+      }
     }
     
     console.log('Updating room with:', updateData)
@@ -205,7 +214,13 @@ export async function submitTheoryAnswer(roomId, userId, questionId, answerIndex
       const playerRef = ref(rtdb, `rooms/${roomId}/players/${userId}`)
       const snapshot = await get(playerRef)
       const currentCorrect = snapshot.val()?.correctAnswers || 0
-      await update(playerRef, { correctAnswers: currentCorrect + 1 })
+      const timestamp = Date.now()
+      
+      // Update both correctAnswers count and lastCorrectAt timestamp for tie-breaking
+      await update(playerRef, { 
+        correctAnswers: currentCorrect + 1,
+        lastCorrectAt: timestamp // Timestamp of when this correct answer was submitted
+      })
     }
   } catch (error) {
     console.error('Error submitting theory answer:', error)
@@ -244,6 +259,7 @@ export async function resetMatch(roomId) {
     updates.startTime = null
     updates.currentQuestionIndex = null
     updates.questionsAnswered = null
+    updates.winCondition = null // Reset win condition for theory race
 
     // Reset each player's state
     if (roomData.players) {
@@ -252,6 +268,7 @@ export async function resetMatch(roomId) {
         updates[`players/${uid}/code`] = null
         updates[`players/${uid}/correctAnswers`] = 0
         updates[`players/${uid}/theoryAnswers`] = null
+        updates[`players/${uid}/lastCorrectAt`] = null // Reset tie-breaking timestamp
       })
     }
 

@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CheckCircle2, XCircle, Clock, Trophy } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { submitTheoryAnswer } from '../services/multiplayer'
 import { getRandomQuestions } from '../data/theoryQuestions'
 
-const WINNING_SCORE = 10
+const DEFAULT_WINNING_SCORE = 10
 
 function TheoryRace({ roomId, roomData, onWinner }) {
   const { currentUser } = useAuth()
@@ -16,7 +16,11 @@ function TheoryRace({ roomId, roomData, onWinner }) {
   const [showFeedback, setShowFeedback] = useState(false)
   const [correctAnswerIndex, setCorrectAnswerIndex] = useState(null)
   const [playerScores, setPlayerScores] = useState({})
-  const [timeRemaining, setTimeRemaining] = useState(30) // 30 seconds per question
+  const [endTime, setEndTime] = useState(null) // End timestamp for current question
+  const [timeRemaining, setTimeRemaining] = useState(30) // Display value (calculated from endTime)
+
+  // Get win condition from room data (set during startMatch) or use default
+  const winCondition = roomData?.winCondition || DEFAULT_WINNING_SCORE
 
   // Initialize questions on mount
   useEffect(() => {
@@ -27,7 +31,55 @@ function TheoryRace({ roomId, roomData, onWinner }) {
     }
   }, [roomData])
 
-  // Update player scores from room data
+  // Ref to track if timeout was handled (prevents multiple submissions)
+  const timeoutHandledRef = useRef(false)
+
+  // handleAnswerSelect callback (defined before timer useEffect to avoid dependency issues)
+  const handleAnswerSelect = useCallback(async (answerIndex, isTimeout = false) => {
+    if (isSubmitting || showFeedback) return
+
+    const question = questions[currentQuestionIndex]
+    if (!question) return
+
+    setIsSubmitting(true)
+    setSelectedAnswer(answerIndex)
+    setCorrectAnswerIndex(question.correct)
+    setShowFeedback(true)
+    setEndTime(null) // Stop the timer
+    timeoutHandledRef.current = true // Mark timeout as handled
+
+    const isCorrect = answerIndex === question.correct
+
+    // Submit answer to Firebase
+    if (roomId && currentUser?.uid) {
+      try {
+        await submitTheoryAnswer(
+          roomId,
+          currentUser.uid,
+          question.id,
+          answerIndex !== null ? answerIndex : -1,
+          isCorrect,
+        )
+      } catch (error) {
+        console.error('Failed to submit answer:', error)
+      }
+    }
+
+    // Move to next question after 2 seconds
+    setTimeout(() => {
+      if (currentQuestionIndex < questions.length - 1) {
+        setCurrentQuestionIndex(currentQuestionIndex + 1)
+        setSelectedAnswer(null)
+        setShowFeedback(false)
+        setCorrectAnswerIndex(null)
+        timeoutHandledRef.current = false // Reset for next question
+        // endTime will be reset by the useEffect when currentQuestionIndex changes
+      }
+      setIsSubmitting(false)
+    }, 2000)
+  }, [isSubmitting, showFeedback, questions, currentQuestionIndex, roomId, currentUser])
+
+  // Update player scores from room data and check for winner
   useEffect(() => {
     if (roomData?.players) {
       const scores = {}
@@ -36,34 +88,66 @@ function TheoryRace({ roomId, roomData, onWinner }) {
       })
       setPlayerScores(scores)
 
-      // Check for winner (first to reach WINNING_SCORE)
-      Object.entries(roomData.players).forEach(([uid, player]) => {
-        if ((player.correctAnswers || 0) >= WINNING_SCORE && !showFeedback) {
-          onWinner({ uid, ...player })
-        }
-      })
-    }
-  }, [roomData, onWinner, showFeedback])
+      // Sort players by score (descending) then by lastCorrectAt (ascending - earlier wins)
+      const sortedPlayers = Object.entries(roomData.players)
+        .map(([uid, player]) => ({
+          uid,
+          ...player,
+          score: player.correctAnswers || 0,
+          lastCorrectAt: player.lastCorrectAt || Infinity, // Use Infinity if no timestamp
+        }))
+        .sort((a, b) => {
+          // Primary sort: highest score first
+          if (b.score !== a.score) {
+            return b.score - a.score
+          }
+          // Secondary sort: earliest timestamp first (tie-breaker)
+          return a.lastCorrectAt - b.lastCorrectAt
+        })
 
-  // Timer countdown
+      // Check for winner: only the top player (after tie-breaking) can win
+      if (sortedPlayers.length > 0) {
+        const topPlayer = sortedPlayers[0]
+        if (topPlayer.score >= winCondition && !showFeedback) {
+          onWinner({ uid: topPlayer.uid, ...topPlayer })
+        }
+      }
+    }
+  }, [roomData, onWinner, showFeedback, winCondition])
+
+  // Timer: Set endTime when question changes
   useEffect(() => {
     if (currentQuestionIndex < questions.length && !showFeedback) {
-      const timer = setInterval(() => {
-        setTimeRemaining((prev) => {
-          if (prev <= 1) {
-            // Time's up - auto-submit wrong answer
-            handleAnswerSelect(null, true)
-            return 30
-          }
-          return prev - 1
-        })
-      }, 1000)
-
-      return () => clearInterval(timer)
+      // Set end time to 30 seconds from now
+      const end = Date.now() + 30000
+      setEndTime(end)
+      timeoutHandledRef.current = false // Reset timeout flag for new question
     }
   }, [currentQuestionIndex, questions.length, showFeedback])
 
-  const handleAnswerSelect = async (answerIndex, isTimeout = false) => {
+  // Timer: Update display based on endTime (prevents pausing when tab is hidden)
+  useEffect(() => {
+    if (endTime && !showFeedback && currentQuestionIndex < questions.length) {
+      const updateTimer = () => {
+        const remaining = Math.max(0, Math.floor((endTime - Date.now()) / 1000))
+        setTimeRemaining(remaining)
+
+        if (remaining <= 0 && !timeoutHandledRef.current) {
+          // Time's up - auto-submit wrong answer (only once per question)
+          timeoutHandledRef.current = true
+          handleAnswerSelect(null, true)
+        }
+      }
+
+      // Update immediately
+      updateTimer()
+
+      // Then update every 100ms for smooth countdown
+      const timer = setInterval(updateTimer, 100)
+
+      return () => clearInterval(timer)
+    }
+  }, [endTime, showFeedback, currentQuestionIndex, questions.length, handleAnswerSelect])
     if (isSubmitting || showFeedback) return
 
     const question = questions[currentQuestionIndex]
@@ -98,7 +182,7 @@ function TheoryRace({ roomId, roomData, onWinner }) {
         setSelectedAnswer(null)
         setShowFeedback(false)
         setCorrectAnswerIndex(null)
-        setTimeRemaining(30)
+        // endTime will be reset by the useEffect when currentQuestionIndex changes
       }
       setIsSubmitting(false)
     }, 2000)
@@ -123,7 +207,7 @@ function TheoryRace({ roomId, roomData, onWinner }) {
           <div className="flex items-center gap-3 sm:gap-6">
             <div>
               <div className="text-xs text-neutral-400">Your Score</div>
-              <div className="text-xl font-bold text-emerald-400 sm:text-2xl">{myScore} / {WINNING_SCORE}</div>
+              <div className="text-xl font-bold text-emerald-400 sm:text-2xl">{myScore} / {winCondition}</div>
             </div>
             <div className="hidden h-12 w-px bg-white/10 sm:block" />
             <div className="hidden sm:block">
@@ -226,16 +310,32 @@ function TheoryRace({ roomId, roomData, onWinner }) {
           Leaderboard
         </h3>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-1 sm:space-y-2 lg:grid-cols-1">
-          {Object.entries(playerScores)
-            .sort(([, a], [, b]) => b - a)
-            .map(([uid, score], index) => {
-              const player = roomData?.players?.[uid]
-              const isMe = uid === currentUser?.uid
-              const isWinner = score >= WINNING_SCORE
+          {(() => {
+            // Sort players with tie-breaking: score (desc) then lastCorrectAt (asc)
+            const sortedPlayers = Object.entries(roomData?.players || {})
+              .map(([uid, player]) => ({
+                uid,
+                ...player,
+                score: player.correctAnswers || 0,
+                lastCorrectAt: player.lastCorrectAt || Infinity,
+              }))
+              .sort((a, b) => {
+                // Primary sort: highest score first
+                if (b.score !== a.score) {
+                  return b.score - a.score
+                }
+                // Secondary sort: earliest timestamp first (tie-breaker)
+                return a.lastCorrectAt - b.lastCorrectAt
+              })
+
+            return sortedPlayers.map((player, index) => {
+              const isMe = player.uid === currentUser?.uid
+              // Only the top player (index 0) who has reached winCondition is the winner
+              const isWinner = index === 0 && player.score >= winCondition
 
               return (
                 <div
-                  key={uid}
+                  key={player.uid}
                   className={`rounded-lg border p-2 sm:p-3 ${
                     isWinner
                       ? 'border-yellow-500 bg-yellow-900/20'
@@ -248,31 +348,32 @@ function TheoryRace({ roomId, roomData, onWinner }) {
                     <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
                       <span className="text-xs font-bold text-neutral-400">#{index + 1}</span>
                       <img
-                        src={player?.photoURL || '/default-avatar.png'}
-                        alt={player?.displayName || 'Player'}
+                        src={player.photoURL || '/default-avatar.png'}
+                        alt={player.displayName || 'Player'}
                         className="h-6 w-6 flex-shrink-0 rounded-full border border-neutral-700 object-cover sm:h-8 sm:w-8"
                         onError={(e) => {
                           e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                            player?.displayName || 'Player',
+                            player.displayName || 'Player',
                           )}&background=dc2626&color=fff&size=32`
                         }}
                       />
                       <span className="truncate text-xs font-semibold text-white sm:text-sm">
-                        <span className="hidden sm:inline">{player?.displayName || 'Anonymous'}</span>
-                        <span className="sm:hidden">{player?.displayName?.split(' ')[0] || 'Anon'}</span>
+                        <span className="hidden sm:inline">{player.displayName || 'Anonymous'}</span>
+                        <span className="sm:hidden">{player.displayName?.split(' ')[0] || 'Anon'}</span>
                         {isMe && <span className="hidden sm:inline"> (You)</span>}
                       </span>
                     </div>
                     <div className="flex items-center gap-1 sm:gap-2">
                       {isWinner && <Trophy size={14} className="flex-shrink-0 text-yellow-500 sm:w-4" />}
                       <span className={`text-sm font-bold sm:text-base ${isWinner ? 'text-yellow-400' : 'text-white'}`}>
-                        {score}
+                        {player.score}
                       </span>
                     </div>
                   </div>
                 </div>
               )
-            })}
+            })
+          })()}
         </div>
       </div>
     </div>

@@ -140,7 +140,18 @@ function Lobby() {
     try {
       // Determine problemId based on match type
       const problemId = matchType === 'theory' ? theoryCategory : '1-20'
-      await startMatch(roomId, problemId, matchType)
+      
+      // For theory race, get question count to set winCondition
+      let questionCount = null
+      if (matchType === 'theory') {
+        const { getRandomQuestions } = await import('../data/theoryQuestions')
+        // Get questions for the selected category (same as TheoryRace component)
+        const questions = getRandomQuestions(theoryCategory, 20)
+        questionCount = questions.length
+        console.log(`Theory race: ${questionCount} questions available for category "${theoryCategory}"`)
+      }
+      
+      await startMatch(roomId, problemId, matchType, questionCount)
       console.log('Match started successfully, waiting for navigation...')
       // Navigation will happen automatically via the useEffect listener
     } catch (err) {
