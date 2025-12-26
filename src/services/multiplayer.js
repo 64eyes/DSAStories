@@ -146,19 +146,20 @@ export async function joinRoom(roomId, user, role = 'player') {
 /**
  * Start a match in a room
  * @param {string} roomId - The room ID
- * @param {string} problemId - The problem/chapter ID (e.g., "1-20") or category for theory race
  * @param {string} matchType - The match type: "coding" or "theory"
- * @param {number} questionCount - Optional: Number of questions for theory race (used to set winCondition)
+ * @param {Object} gamePayload - Payload containing game-specific data
+ *   - For theory: { questions: Array, category: string }
+ *   - For coding: { problemId: string }
  * @returns {Promise<void>}
  * @throws {Error} - If room doesn't exist or start fails
  */
-export async function startMatch(roomId, problemId, matchType = 'coding', questionCount = null) {
+export async function startMatch(roomId, matchType = 'coding', gamePayload = {}) {
   if (!rtdb) {
     throw new Error('Realtime Database is not initialized. Please check your Firebase configuration.')
   }
 
-  if (!roomId || !problemId) {
-    throw new Error('roomId and problemId are required')
+  if (!roomId) {
+    throw new Error('roomId is required')
   }
 
   try {
@@ -178,22 +179,33 @@ export async function startMatch(roomId, problemId, matchType = 'coding', questi
     const updateData = {
       status: 'playing',
       matchType: matchType,
-      currentProblemId: problemId,
       startTime: serverTimestamp(), // Use server timestamp for sync across all clients
     }
     
-    // For theory race, initialize question tracking and set win condition
+    // For theory race, save questions and set win condition
     if (matchType === 'theory') {
+      if (!gamePayload.questions || !Array.isArray(gamePayload.questions)) {
+        throw new Error('gamePayload.questions array is required for theory matches')
+      }
+
+      // Save questions to gameData/questions so all players see the same list
+      updateData.gameData = {
+        questions: gamePayload.questions,
+      }
+      
+      updateData.currentProblemId = gamePayload.category || 'cpp'
       updateData.currentQuestionIndex = 0
       updateData.questionsAnswered = {}
       
       // Set win condition: first to 10 correct answers, or total questions if less than 10
-      if (questionCount && questionCount > 0) {
-        updateData.winCondition = Math.min(10, questionCount)
-      } else {
-        // Default to 10 if questionCount not provided
-        updateData.winCondition = 10
+      const questionCount = gamePayload.questions.length
+      updateData.winCondition = Math.min(10, questionCount)
+    } else {
+      // For coding matches
+      if (!gamePayload.problemId) {
+        throw new Error('gamePayload.problemId is required for coding matches')
       }
+      updateData.currentProblemId = gamePayload.problemId
     }
     
     console.log('Updating room with:', updateData)
@@ -229,7 +241,7 @@ export async function submitTheoryAnswer(roomId, userId, questionId, answerIndex
     await set(answerRef, {
       answerIndex,
       isCorrect,
-      timestamp: Date.now(),
+      timestamp: serverTimestamp(),
     })
 
     // Update player's correct count if answer is correct
@@ -237,12 +249,12 @@ export async function submitTheoryAnswer(roomId, userId, questionId, answerIndex
       const playerRef = ref(rtdb, `rooms/${roomId}/players/${userId}`)
       const snapshot = await get(playerRef)
       const currentCorrect = snapshot.val()?.correctAnswers || 0
-      const timestamp = Date.now()
       
       // Update both correctAnswers count and lastCorrectAt timestamp for tie-breaking
+      // Use serverTimestamp() so all clients have the same reference point
       await update(playerRef, { 
         correctAnswers: currentCorrect + 1,
-        lastCorrectAt: timestamp // Timestamp of when this correct answer was submitted
+        lastCorrectAt: serverTimestamp() // Server timestamp for accurate tie-breaking
       })
     }
   } catch (error) {
@@ -283,6 +295,7 @@ export async function resetMatch(roomId) {
     updates.currentQuestionIndex = null
     updates.questionsAnswered = null
     updates.winCondition = null // Reset win condition for theory race
+    updates.gameData = null // Clear gameData/questions for next round
 
     // Reset each player's state
     if (roomData.players) {
@@ -292,6 +305,7 @@ export async function resetMatch(roomId) {
         updates[`players/${uid}/correctAnswers`] = 0
         updates[`players/${uid}/theoryAnswers`] = null
         updates[`players/${uid}/lastCorrectAt`] = null // Reset tie-breaking timestamp
+        updates[`players/${uid}/currentQuestionIndex`] = null // Reset question index
       })
     }
 
@@ -409,6 +423,32 @@ export async function flagSuspiciousActivity(roomId, userId, type) {
   } catch (error) {
     console.error('Error flagging suspicious activity:', error)
     throw new Error(`Failed to flag suspicious activity: ${error.message}`)
+  }
+}
+
+/**
+ * Update a player's current question index
+ * @param {string} roomId - The room ID
+ * @param {string} userId - The user's Firebase UID
+ * @param {number} index - The current question index
+ * @returns {Promise<void>}
+ * @throws {Error} - If update fails
+ */
+export async function updatePlayerQuestionIndex(roomId, userId, index) {
+  if (!rtdb) {
+    throw new Error('Realtime Database is not initialized. Please check your Firebase configuration.')
+  }
+
+  if (!roomId || !userId || index === undefined) {
+    throw new Error('roomId, userId, and index are required')
+  }
+
+  try {
+    const playerRef = ref(rtdb, `rooms/${roomId}/players/${userId}/currentQuestionIndex`)
+    await set(playerRef, index)
+  } catch (error) {
+    console.error('Error updating player question index:', error)
+    throw new Error(`Failed to update player question index: ${error.message}`)
   }
 }
 

@@ -147,20 +147,27 @@ function Lobby() {
     setError(null)
 
     try {
-      // Determine problemId based on match type
-      const problemId = matchType === 'theory' ? theoryCategory : '1-20'
+      let gamePayload = {}
       
-      // For theory race, get question count to set winCondition
-      let questionCount = null
       if (matchType === 'theory') {
+        // Generate questions on the host side
         const { getRandomQuestions } = await import('../data/theoryQuestions')
-        // Get questions for the selected category (same as TheoryRace component)
         const questions = getRandomQuestions(theoryCategory, 20)
-        questionCount = questions.length
-        console.log(`Theory race: ${questionCount} questions available for category "${theoryCategory}"`)
+        
+        gamePayload = {
+          questions: questions,
+          category: theoryCategory,
+        }
+        
+        console.log(`Theory race: ${questions.length} questions generated for category "${theoryCategory}"`)
+      } else {
+        // For coding matches
+        gamePayload = {
+          problemId: '1-20',
+        }
       }
       
-      await startMatch(roomId, problemId, matchType, questionCount)
+      await startMatch(roomId, matchType, gamePayload)
       console.log('Match started successfully, waiting for navigation...')
       // Navigation will happen automatically via the useEffect listener
     } catch (err) {
