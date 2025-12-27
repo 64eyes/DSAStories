@@ -60,18 +60,9 @@ function MultiplayerArena({ roomId }) {
         const players = Object.entries(data.players)
         
         if (data.matchType === 'theory') {
-          // Theory race: winner is first to 10 correct answers
-          const winnerPlayer = players.find(([uid, player]) => (player.correctAnswers || 0) >= 10)
-          if (winnerPlayer && !winner) {
-            const [winnerUid, winnerData] = winnerPlayer
-            setWinner({
-              uid: winnerUid,
-              ...winnerData,
-            })
-            setShowConfetti(true)
-            setShowPostMatch(true)
-            setTimeout(() => setShowConfetti(false), 5000)
-          }
+          // Theory race: winner is determined by TheoryRace component
+          // Match ends when all questions are answered, winner is highest score
+          // This logic is handled in TheoryRace component, so we don't need to check here
         } else {
           // Coding challenge: winner is first to success
           const winnerPlayer = players.find(([uid, player]) => player.status === 'success')

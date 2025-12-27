@@ -17,6 +17,7 @@ function TheoryRace({ roomId, roomData, onWinner, isSpectator = false }) {
   const [playerScores, setPlayerScores] = useState({})
   const [targetTime, setTargetTime] = useState(null) // Target timestamp for current question
   const [timeRemaining, setTimeRemaining] = useState(30) // Display value (calculated from targetTime)
+  const winnerDeclaredRef = useRef(false) // Track if winner has been declared to prevent multiple calls
 
   // Get win condition from room data (set during startMatch) or use default
   const winCondition = roomData?.winCondition || DEFAULT_WINNING_SCORE
@@ -168,42 +169,69 @@ function TheoryRace({ roomId, roomData, onWinner, isSpectator = false }) {
           return a.lastCorrectAt - b.lastCorrectAt
         })
 
-      // Check for winner: only the top player (after tie-breaking) can win
-      if (sortedPlayers.length > 0) {
+      // Check for match end: when all questions are answered by at least one player
+      // Match ends when any player has answered all questions (reached the last question)
+      const maxQuestionIndex = questions.length - 1
+      const hasPlayerFinished = sortedPlayers.some(
+        (player) => (player.currentQuestionIndex ?? 0) >= maxQuestionIndex
+      )
+      
+      // If match has ended, determine winner based on highest score
+      if (hasPlayerFinished && sortedPlayers.length > 0 && !winnerDeclaredRef.current) {
         const topPlayer = sortedPlayers[0]
-        // Only declare winner if current user is at index 0 AND has reached win condition
-        const isCurrentUserWinner = topPlayer.uid === currentUser?.uid && topPlayer.score >= winCondition
-        if (isCurrentUserWinner && !showFeedback) {
-          onWinner({ uid: topPlayer.uid, ...topPlayer })
-        }
+        // Declare winner: player with highest score (or earliest timestamp if tied)
+        // Only trigger once per match
+        winnerDeclaredRef.current = true
+        onWinner({ uid: topPlayer.uid, ...topPlayer })
       }
     }
-  }, [roomData, onWinner, showFeedback, winCondition, currentUser?.uid])
+  }, [roomData, onWinner, questions.length])
 
   // Timer: Set targetTime when question changes (only for players)
-  // Use a ref to track the last question index to prevent reset when roomData updates
-  const lastQuestionIndexRef = useRef(currentQuestionIndex)
+  // Use refs to track state and prevent reset when roomData updates
+  const lastQuestionIndexRef = useRef(-1) // Initialize to -1 to ensure first question triggers timer
+  const targetTimeRef = useRef(null) // Store targetTime in ref to prevent reset on re-renders
+  const isInitializedRef = useRef(false) // Track if timer has been initialized
   
   useEffect(() => {
     // Only reset timer if the current user's question index actually changed
     // This prevents timer reset when other players update their question index
     if (isPlayer && currentQuestionIndex < questions.length && !showFeedback) {
       // Only reset if this is a new question for the current user
+      // Check against ref to avoid reset when roomData updates cause re-renders
       if (lastQuestionIndexRef.current !== currentQuestionIndex) {
         // Set target time to 30 seconds from now
         const target = Date.now() + 30000
+        targetTimeRef.current = target
         setTargetTime(target)
         timeoutHandledRef.current = false // Reset timeout flag for new question
         lastQuestionIndexRef.current = currentQuestionIndex // Update ref
+        isInitializedRef.current = true
       }
     }
   }, [isPlayer, currentQuestionIndex, questions.length, showFeedback])
+  
+  // Initialize targetTime on mount if not set (only once)
+  useEffect(() => {
+    if (isPlayer && !isInitializedRef.current && currentQuestionIndex < questions.length && !showFeedback && questions.length > 0) {
+      const target = Date.now() + 30000
+      targetTimeRef.current = target
+      setTargetTime(target)
+      lastQuestionIndexRef.current = currentQuestionIndex
+      isInitializedRef.current = true
+    }
+  }, [isPlayer, questions.length, currentQuestionIndex, showFeedback])
 
   // Timer: Update display based on targetTime (prevents pausing when tab is hidden)
+  // Use ref to access targetTime to prevent reset when roomData updates
   useEffect(() => {
-    if (isPlayer && targetTime && !showFeedback && currentQuestionIndex < questions.length) {
+    if (isPlayer && !showFeedback && currentQuestionIndex < questions.length) {
       const updateTimer = () => {
-        const remaining = Math.max(0, Math.floor((targetTime - Date.now()) / 1000))
+        // Always use ref value to prevent reset on re-renders caused by roomData updates
+        const currentTargetTime = targetTimeRef.current
+        if (!currentTargetTime) return
+        
+        const remaining = Math.max(0, Math.floor((currentTargetTime - Date.now()) / 1000))
         setTimeRemaining(remaining)
 
         if (remaining <= 0 && !timeoutHandledRef.current) {
@@ -221,7 +249,7 @@ function TheoryRace({ roomId, roomData, onWinner, isSpectator = false }) {
 
       return () => clearInterval(timer)
     }
-  }, [isPlayer, targetTime, showFeedback, currentQuestionIndex, questions.length, handleAnswerSelect])
+  }, [isPlayer, showFeedback, currentQuestionIndex, questions.length, handleAnswerSelect])
 
   // Find leader for spectator view
   const leader = isSpectator
