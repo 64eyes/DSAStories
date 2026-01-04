@@ -3,6 +3,8 @@ import { motion } from 'framer-motion'
 import { CheckCircle2, XCircle, Clock, Trophy, Eye } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { submitTheoryAnswer, updatePlayerQuestionIndex } from '../services/multiplayer'
+import { calculateRatingChange, updateUserStats } from '../services/rating'
+import { getUserProfile } from '../services/firebase'
 
 const DEFAULT_WINNING_SCORE = 10
 
@@ -18,6 +20,7 @@ function TheoryRace({ roomId, roomData, onWinner, isSpectator = false }) {
   const [targetTime, setTargetTime] = useState(null) // Target timestamp for current question
   const [timeRemaining, setTimeRemaining] = useState(30) // Display value (calculated from targetTime)
   const winnerDeclaredRef = useRef(false) // Track if winner has been declared to prevent multiple calls
+  const ratingUpdatedRef = useRef(false) // Track if rating has been updated to prevent multiple updates
 
   // Get win condition from room data (set during startMatch) or use default
   const winCondition = roomData?.winCondition || DEFAULT_WINNING_SCORE
@@ -182,6 +185,56 @@ function TheoryRace({ roomId, roomData, onWinner, isSpectator = false }) {
         // Declare winner: player with highest score (or earliest timestamp if tied)
         // Only trigger once per match
         winnerDeclaredRef.current = true
+        
+        // Calculate and update ratings for current user
+        if (isPlayer && currentUser?.uid && !ratingUpdatedRef.current) {
+          ratingUpdatedRef.current = true
+          
+          // Find current user's rank in sorted players
+          const currentUserIndex = sortedPlayers.findIndex((p) => p.uid === currentUser.uid)
+          if (currentUserIndex !== -1) {
+            const currentUserRank = currentUserIndex + 1
+            const totalPlayers = sortedPlayers.length
+            
+            // Get current user's Elo rating and update stats
+            getUserProfile(currentUser.uid)
+              .then((profile) => {
+                const currentElo = profile.elo || 1200
+                
+                // Calculate rating change
+                const ratingChange = calculateRatingChange(currentElo, currentUserRank, totalPlayers)
+                const isWin = currentUserRank === 1
+                
+                // Update user stats in Firestore
+                return updateUserStats(currentUser.uid, isWin, ratingChange).then((result) => ({
+                  ...result,
+                  ratingChange, // Include the calculated rating change
+                  oldElo: currentElo, // Include old Elo for display
+                }))
+              })
+              .then((ratingData) => {
+                // Pass rating change data to onWinner callback
+                onWinner({
+                  uid: topPlayer.uid,
+                  ...topPlayer,
+                  ratingChange: ratingData.ratingChange,
+                  newElo: ratingData.newElo,
+                  newRank: ratingData.newRank,
+                  oldElo: ratingData.oldElo,
+                })
+              })
+              .catch((error) => {
+                console.error('Failed to update rating:', error)
+                // Still call onWinner even if rating update fails
+                onWinner({ uid: topPlayer.uid, ...topPlayer })
+              })
+            
+            // Don't call onWinner here - wait for rating update
+            return
+          }
+        }
+        
+        // For spectators or if rating update failed, call onWinner directly
         onWinner({ uid: topPlayer.uid, ...topPlayer })
       }
     }

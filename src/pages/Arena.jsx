@@ -5,6 +5,7 @@ import { Users, AlertTriangle, RotateCcw, Home } from 'lucide-react'
 import Confetti from 'react-confetti'
 import CodeEditor from '../components/CodeEditor'
 import TheoryRace from '../components/TheoryRace'
+import EloAnimation from '../components/EloAnimation'
 import { useAuth } from '../contexts/AuthContext'
 import { subscribeToRoom, updatePlayerStatus, updatePlayerCode, flagSuspiciousActivity, resetMatch } from '../services/multiplayer'
 import { CHAPTER_CONTENT } from '../data/chapterContent'
@@ -37,6 +38,9 @@ function MultiplayerArena({ roomId }) {
   const [winner, setWinner] = useState(null)
   const [showConfetti, setShowConfetti] = useState(false)
   const [showPostMatch, setShowPostMatch] = useState(false)
+  const [ratingChange, setRatingChange] = useState(null) // Store rating change data for animation
+  const [oldElo, setOldElo] = useState(null)
+  const [newElo, setNewElo] = useState(null)
   
   // Get role from navigation state or determine from room data
   const roleFromState = location.state?.role
@@ -236,6 +240,11 @@ function MultiplayerArena({ roomId }) {
               : `${winner.displayName || 'A player'} won the match!`}
           </p>
           
+          {/* Rating Change Animation */}
+          {ratingChange !== null && oldElo !== null && newElo !== null && (
+            <EloAnimation oldElo={oldElo} newElo={newElo} ratingChange={ratingChange} />
+          )}
+          
           <div className="mb-8 flex justify-center gap-4">
             <button
               onClick={handleNextChallenge}
@@ -279,6 +288,12 @@ function MultiplayerArena({ roomId }) {
           isSpectator={isSpectator}
           onWinner={(winnerData) => {
             setWinner(winnerData)
+            // Store rating change data if available
+            if (winnerData.ratingChange !== undefined) {
+              setRatingChange(winnerData.ratingChange)
+              setOldElo(winnerData.oldElo)
+              setNewElo(winnerData.newElo)
+            }
             // Only set confetti if current user is the winner or is a spectator
             if (winnerData.uid === currentUser?.uid || isSpectator) {
               setShowConfetti(true)

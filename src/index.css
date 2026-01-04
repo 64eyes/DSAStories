@@ -39,7 +39,7 @@ a {
 button, a {
   -webkit-tap-highlight-color: transparent;
   user-select: none;
-}
+  }
 
 /* Improve scrolling on mobile */
 * {
