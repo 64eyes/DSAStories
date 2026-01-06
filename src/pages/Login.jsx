@@ -5,6 +5,7 @@ import {
   signUpWithEmailPassword,
   signInWithEmailPassword,
 } from '../services/firebase'
+import { getAuthErrorMessage } from '../utils/authErrors'
 import { Loader2 } from 'lucide-react'
 
 function Login() {
@@ -23,7 +24,7 @@ function Login() {
       await signInWithGoogle()
       navigate('/campaign')
     } catch (err) {
-      setError(err.message || 'Failed to sign in with Google')
+      setError(getAuthErrorMessage(err))
       setIsLoading(false)
     }
   }
@@ -41,7 +42,7 @@ function Login() {
       }
       navigate('/campaign')
     } catch (err) {
-      setError(err.message || `Failed to ${mode === 'signup' ? 'sign up' : 'sign in'}`)
+      setError(getAuthErrorMessage(err))
       setIsLoading(false)
     }
   }
