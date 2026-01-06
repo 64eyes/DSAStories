@@ -94,11 +94,19 @@ function MultiplayerArena({ roomId }) {
   const chapter = CHAPTER_CONTENT[problemId]
 
   // Determine role: check navigation state first, then room data
-  const isSpectator = roleFromState === 'spectator' || 
-    (currentUser?.uid && roomData?.spectators?.[currentUser.uid] && !roomData?.players?.[currentUser.uid])
-  const isPlayer = !isSpectator && currentUser?.uid && roomData?.players?.[currentUser.uid] ? true : false
+  const playerRecord =
+    currentUser?.uid && roomData?.players ? roomData.players[currentUser.uid] : null
+  const isSpectatorExplicit = roleFromState === 'spectator'
+  const isSpectatorFromRoom =
+    currentUser?.uid &&
+    roomData?.spectators?.[currentUser.uid] &&
+    (!playerRecord || playerRecord.status === 'left')
+  const isSpectator = isSpectatorExplicit || isSpectatorFromRoom
+  const isPlayer =
+    !isSpectator &&
+    !!(currentUser?.uid && playerRecord && playerRecord.status !== 'left')
 
-  // Warn players before leaving an active match (browser/tab close, hard navigation)
+  // Warn players before leaving an active match (browser/tab close)
   useEffect(() => {
     if (!roomData || roomData.status !== 'playing' || !isPlayer) return
 
@@ -114,6 +122,31 @@ function MultiplayerArena({ roomId }) {
     }
   }, [roomData?.status, isPlayer])
 
+  // Intercept browser back/forward navigation during an active match
+  useEffect(() => {
+    if (!roomData || roomData.status !== 'playing' || !isPlayer) return
+
+    const handlePopState = () => {
+      const message =
+        'Are you sure you want to leave this match? You will be marked as having left.'
+      const confirmLeave = window.confirm(message)
+      if (!confirmLeave) {
+        // User cancelled navigation; reload current route to keep them in the arena
+        navigate(0)
+      } else if (roomId && currentUser?.uid) {
+        leaveMatch(roomId, currentUser.uid).catch((error) => {
+          console.error('Failed to mark player as left match on back/forward:', error)
+        })
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [roomData?.status, isPlayer, roomId, currentUser?.uid, navigate])
+
   // Mark player as having left when component unmounts during an active match
   useEffect(() => {
     return () => {
@@ -125,8 +158,10 @@ function MultiplayerArena({ roomId }) {
     }
   }, [roomId, currentUser?.uid, roomData?.status, isPlayer])
 
-  // Get all players
-  const allPlayers = roomData?.players ? Object.entries(roomData.players) : []
+  // Get all active players (exclude those who left)
+  const allPlayers = roomData?.players
+    ? Object.entries(roomData.players).filter(([, player]) => player.status !== 'left')
+    : []
 
   // Get opponents (filter out current user)
   const opponents = allPlayers.filter(([uid]) => uid !== currentUser?.uid)
