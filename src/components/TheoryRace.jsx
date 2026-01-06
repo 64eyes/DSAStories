@@ -134,7 +134,7 @@ function TheoryRace({ roomId, roomData, onWinner, isSpectator = false }) {
 
   // Update player scores from room data and check for winner
   useEffect(() => {
-    if (roomData?.players) {
+    if (roomData?.players && questions.length > 0) {
       const scores = {}
       Object.entries(roomData.players).forEach(([uid, player]) => {
         scores[uid] = player.correctAnswers || 0
@@ -174,9 +174,12 @@ function TheoryRace({ roomId, roomData, onWinner, isSpectator = false }) {
 
       // Check for match end: when all questions are answered by at least one player
       // Match ends when any player has answered all questions (reached the last question)
+      // AND has at least one correct answer (prevents instant win at game start)
       const maxQuestionIndex = questions.length - 1
       const hasPlayerFinished = sortedPlayers.some(
-        (player) => (player.currentQuestionIndex ?? 0) >= maxQuestionIndex
+        (player) =>
+          (player.currentQuestionIndex ?? 0) >= maxQuestionIndex &&
+          (player.correctAnswers || 0) > 0,
       )
       
       // If match has ended, determine winner based on highest score

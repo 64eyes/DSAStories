@@ -111,6 +111,15 @@ export async function joinRoom(roomId, user, role = 'player') {
     }
 
     if (role === 'spectator') {
+      // If user was previously a player, remove them from players list
+      const playerRef = ref(rtdb, `rooms/${roomId}/players/${user.uid}`)
+      const playerSnapshot = await get(playerRef)
+      if (playerSnapshot.exists()) {
+        // Setting a path to null in update() removes it
+        const roomPlayersRef = ref(rtdb, `rooms/${roomId}/players`)
+        await update(roomPlayersRef, { [user.uid]: null })
+      }
+
       // Add user to spectators object
       const spectatorRef = ref(rtdb, `rooms/${roomId}/spectators/${user.uid}`)
       await set(spectatorRef, {

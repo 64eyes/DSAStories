@@ -73,7 +73,7 @@ function Navbar() {
           ))}
         </nav>
 
-        {/* Desktop User Menu / Login */}
+        {/* Desktop User Menu / Login / Signup */}
         <div className="hidden items-center gap-3 md:flex">
           {currentUser ? (
             <div className="relative" ref={dropdownRef}>
@@ -123,10 +123,19 @@ function Navbar() {
               )}
             </div>
           ) : (
-            <NavLink to="/login" className={linkClasses}>
-              <LogIn size={18} />
-              <span className="hidden lg:inline">Login</span>
-            </NavLink>
+            <>
+              <NavLink to="/login" className={linkClasses}>
+                <LogIn size={18} />
+                <span className="hidden lg:inline">Login</span>
+              </NavLink>
+              <NavLink
+                to="/login"
+                className="flex items-center gap-2 rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700"
+              >
+                <span className="hidden lg:inline">Sign Up</span>
+                <span className="lg:hidden">Join</span>
+              </NavLink>
+            </>
           )}
         </div>
 
@@ -179,14 +188,23 @@ function Navbar() {
                 </button>
               </>
             ) : (
-              <NavLink
-                to="/login"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className={linkClasses}
-              >
-                <LogIn size={18} />
-                Login
-              </NavLink>
+              <>
+                <NavLink
+                  to="/login"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={linkClasses}
+                >
+                  <LogIn size={18} />
+                  Login
+                </NavLink>
+                <NavLink
+                  to="/login"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="mt-1 flex items-center gap-2 rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700"
+                >
+                  Sign Up
+                </NavLink>
+              </>
             )}
           </nav>
         </div>

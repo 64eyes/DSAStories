@@ -481,7 +481,7 @@ function Lobby() {
                     placeholder="Enter 6-digit code"
                     maxLength={6}
                     disabled={isJoining || !currentUser}
-                    className="w-full rounded-lg border border-neutral-800 bg-neutral-800 px-4 py-3 font-mono text-center text-xl tracking-widest text-white placeholder:text-neutral-600 focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-600/20 disabled:cursor-not-allowed disabled:opacity-50 sm:px-6 sm:py-4 sm:text-2xl"
+                    className="w-full rounded-lg border border-neutral-800 bg-neutral-800 px-3 py-3 font-mono text-center text-lg tracking-[0.4em] text-white placeholder:text-neutral-600 focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-600/20 disabled:cursor-not-allowed disabled:opacity-50 sm:px-6 sm:py-4 sm:text-2xl sm:tracking-[0.6em]"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !isJoining && currentUser && joinRoomId.length === 6) {
                         handleJoinRoom('player')

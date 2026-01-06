@@ -1,5 +1,12 @@
 import { initializeApp } from 'firebase/app'
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth'
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+} from 'firebase/auth'
 import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore'
 import { getDatabase } from 'firebase/database'
 
@@ -54,6 +61,72 @@ export async function signInWithGoogle() {
     const result = await signInWithPopup(auth, googleProvider)
     return result
   } catch (error) {
+    throw error
+  }
+}
+
+/**
+ * Sign up with email and password
+ * @param {string} email
+ * @param {string} password
+ * @returns {Promise<UserCredential>}
+ */
+export async function signUpWithEmailPassword(email, password) {
+  if (!auth) {
+    throw new Error('Firebase Auth is not initialized. Please check your Firebase configuration.')
+  }
+
+  if (!email || !password) {
+    throw new Error('Email and password are required')
+  }
+
+  try {
+    const result = await createUserWithEmailAndPassword(auth, email, password)
+
+    // Create a basic user profile document with default Elo and rank
+    if (db && result.user?.uid) {
+      const userRef = doc(db, 'users', result.user.uid)
+      await setDoc(
+        userRef,
+        {
+          email: result.user.email,
+          displayName: result.user.displayName || '',
+          elo: 1200,
+          rank: 'Novice',
+          createdAt: new Date().toISOString(),
+          lastUpdated: new Date().toISOString(),
+        },
+        { merge: true },
+      )
+    }
+
+    return result
+  } catch (error) {
+    console.error('Error signing up with email and password:', error)
+    throw error
+  }
+}
+
+/**
+ * Sign in with email and password
+ * @param {string} email
+ * @param {string} password
+ * @returns {Promise<UserCredential>}
+ */
+export async function signInWithEmailPassword(email, password) {
+  if (!auth) {
+    throw new Error('Firebase Auth is not initialized. Please check your Firebase configuration.')
+  }
+
+  if (!email || !password) {
+    throw new Error('Email and password are required')
+  }
+
+  try {
+    const result = await signInWithEmailAndPassword(auth, email, password)
+    return result
+  } catch (error) {
+    console.error('Error signing in with email and password:', error)
     throw error
   }
 }
