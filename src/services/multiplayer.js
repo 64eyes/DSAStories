@@ -111,13 +111,12 @@ export async function joinRoom(roomId, user, role = 'player') {
     }
 
     if (role === 'spectator') {
-      // If user was previously a player, remove them from players list
+      // If user was previously a player, mark them as left and remove from active players list
       const playerRef = ref(rtdb, `rooms/${roomId}/players/${user.uid}`)
       const playerSnapshot = await get(playerRef)
       if (playerSnapshot.exists()) {
-        // Setting a path to null in update() removes it
-        const roomPlayersRef = ref(rtdb, `rooms/${roomId}/players`)
-        await update(roomPlayersRef, { [user.uid]: null })
+        // Mark status as left so other clients can display this
+        await update(playerRef, { status: 'left' })
       }
 
       // Add user to spectators object
@@ -184,7 +183,7 @@ export async function startMatch(roomId, matchType = 'coding', gamePayload = {})
     const roomData = snapshot.val()
     console.log('Current room data before update:', roomData)
 
-    // Update room status to playing
+    // Base room update data
     const updateData = {
       status: 'playing',
       matchType: matchType,
@@ -217,8 +216,20 @@ export async function startMatch(roomId, matchType = 'coding', gamePayload = {})
       updateData.currentProblemId = gamePayload.problemId
     }
     
-    console.log('Updating room with:', updateData)
-    await update(roomRef, updateData)
+    // Reset all player progress for the new match to avoid stale data
+    const resetPlayers = {}
+    if (roomData.players) {
+      Object.keys(roomData.players).forEach((uid) => {
+        resetPlayers[`players/${uid}/correctAnswers`] = 0
+        resetPlayers[`players/${uid}/theoryAnswers`] = {}
+        resetPlayers[`players/${uid}/currentQuestionIndex`] = 0
+        resetPlayers[`players/${uid}/lastCorrectAt`] = null
+        resetPlayers[`players/${uid}/status`] = 'coding'
+      })
+    }
+
+    console.log('Updating room with:', { ...updateData, ...resetPlayers })
+    await update(roomRef, { ...updateData, ...resetPlayers })
     console.log('Room updated successfully')
   } catch (error) {
     console.error('Error starting match:', error)
@@ -269,6 +280,32 @@ export async function submitTheoryAnswer(roomId, userId, questionId, answerIndex
   } catch (error) {
     console.error('Error submitting theory answer:', error)
     throw new Error(`Failed to submit theory answer: ${error.message}`)
+  }
+}
+
+/**
+ * Mark a player as having left an active match
+ * @param {string} roomId
+ * @param {string} userId
+ * @returns {Promise<void>}
+ */
+export async function leaveMatch(roomId, userId) {
+  if (!rtdb) {
+    throw new Error('Realtime Database is not initialized. Please check your Firebase configuration.')
+  }
+
+  if (!roomId || !userId) {
+    throw new Error('roomId and userId are required')
+  }
+
+  try {
+    const playerRef = ref(rtdb, `rooms/${roomId}/players/${userId}`)
+    await update(playerRef, {
+      status: 'left',
+    })
+  } catch (error) {
+    console.error('Error leaving match:', error)
+    throw new Error(`Failed to leave match: ${error.message}`)
   }
 }
 

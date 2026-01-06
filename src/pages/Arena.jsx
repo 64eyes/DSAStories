@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Users, AlertTriangle, RotateCcw, Home } from 'lucide-react'
@@ -7,7 +7,7 @@ import CodeEditor from '../components/CodeEditor'
 import TheoryRace from '../components/TheoryRace'
 import EloAnimation from '../components/EloAnimation'
 import { useAuth } from '../contexts/AuthContext'
-import { subscribeToRoom, updatePlayerStatus, updatePlayerCode, flagSuspiciousActivity, resetMatch } from '../services/multiplayer'
+import { subscribeToRoom, updatePlayerStatus, updatePlayerCode, flagSuspiciousActivity, resetMatch, leaveMatch } from '../services/multiplayer'
 import { CHAPTER_CONTENT } from '../data/chapterContent'
 
 // Solo Mode (no roomId)
@@ -97,6 +97,33 @@ function MultiplayerArena({ roomId }) {
   const isSpectator = roleFromState === 'spectator' || 
     (currentUser?.uid && roomData?.spectators?.[currentUser.uid] && !roomData?.players?.[currentUser.uid])
   const isPlayer = !isSpectator && currentUser?.uid && roomData?.players?.[currentUser.uid] ? true : false
+
+  // Warn players before leaving an active match (browser/tab close, hard navigation)
+  useEffect(() => {
+    if (!roomData || roomData.status !== 'playing' || !isPlayer) return
+
+    const handleBeforeUnload = (event) => {
+      event.preventDefault()
+      event.returnValue = 'Are you sure you want to leave this match? You will be marked as having left.'
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [roomData?.status, isPlayer])
+
+  // Mark player as having left when component unmounts during an active match
+  useEffect(() => {
+    return () => {
+      if (roomId && currentUser?.uid && roomData?.status === 'playing' && isPlayer) {
+        leaveMatch(roomId, currentUser.uid).catch((error) => {
+          console.error('Failed to mark player as left match:', error)
+        })
+      }
+    }
+  }, [roomId, currentUser?.uid, roomData?.status, isPlayer])
 
   // Get all players
   const allPlayers = roomData?.players ? Object.entries(roomData.players) : []

@@ -144,6 +144,8 @@ function TheoryRace({ roomId, roomData, onWinner, isSpectator = false }) {
       // Sort players by score (descending) then by lastCorrectAt (ascending - earlier wins)
       // Handle serverTimestamp() which may be an object initially
       const sortedPlayers = Object.entries(roomData.players)
+        // Exclude players who have explicitly left the match
+        .filter(([uid, player]) => player.status !== 'left')
         .map(([uid, player]) => {
           // Handle Firebase serverTimestamp - it may be an object {'.sv': 'timestamp'} initially
           let lastCorrectAt = Infinity
@@ -417,6 +419,8 @@ function TheoryRace({ roomId, roomData, onWinner, isSpectator = false }) {
             <div className="space-y-2">
               {(() => {
                 const sortedPlayers = Object.entries(roomData?.players || {})
+                  // Exclude players who have explicitly left the match
+                  .filter(([uid, player]) => player.status !== 'left')
                   .map(([uid, player]) => ({
                     uid,
                     ...player,
