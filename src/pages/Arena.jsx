@@ -43,6 +43,7 @@ function MultiplayerArena({ roomId }) {
   const [leaveModalConfig, setLeaveModalConfig] = useState({ title: '', message: '', variant: 'danger' })
   const [pendingLeaveAction, setPendingLeaveAction] = useState(null) // 'player' or 'spectator'
   const [notification, setNotification] = useState({ isOpen: false, message: '', type: 'info' })
+  const previousPlayersRef = useRef(null) // Track previous player states to detect changes
   const [winner, setWinner] = useState(null)
   const [showConfetti, setShowConfetti] = useState(false)
   const [showPostMatch, setShowPostMatch] = useState(false)
