@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate, useLocation, useBlocker } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Users, AlertTriangle, RotateCcw, Home } from 'lucide-react'
 import Confetti from 'react-confetti'
@@ -121,42 +121,6 @@ function MultiplayerArena({ roomId }) {
       window.removeEventListener('beforeunload', handleBeforeUnload)
     }
   }, [roomData?.status, isPlayer])
-
-  // Block navigation during an active match using React Router's useBlocker
-  const shouldBlock = roomData?.status === 'playing' && isPlayer
-  const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) =>
-      shouldBlock && currentLocation.pathname !== nextLocation.pathname
-  )
-
-  // Handle blocked navigation
-  useEffect(() => {
-    if (blocker.state === 'blocked') {
-      const confirmLeave = window.confirm(
-        'Are you sure you want to leave this match? You will be marked as having left and cannot rejoin as a player.'
-      )
-      
-      if (confirmLeave) {
-        // User confirmed - mark as left and proceed with navigation
-        if (roomId && currentUser?.uid) {
-          leaveMatch(roomId, currentUser.uid)
-            .then(() => {
-              blocker.proceed()
-            })
-            .catch((error) => {
-              console.error('Failed to mark player as left match:', error)
-              // Still proceed with navigation even if marking as left fails
-              blocker.proceed()
-            })
-        } else {
-          blocker.proceed()
-        }
-      } else {
-        // User cancelled - stay in the match
-        blocker.reset()
-      }
-    }
-  }, [blocker, roomId, currentUser?.uid])
 
   // Mark player as having left when component unmounts during an active match
   useEffect(() => {
