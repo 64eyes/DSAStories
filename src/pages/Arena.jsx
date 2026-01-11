@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Users, AlertTriangle, RotateCcw, Home, LogOut, X } from 'lucide-react'
@@ -6,6 +6,8 @@ import Confetti from 'react-confetti'
 import CodeEditor from '../components/CodeEditor'
 import TheoryRace from '../components/TheoryRace'
 import EloAnimation from '../components/EloAnimation'
+import ConfirmModal from '../components/ConfirmModal'
+import NotificationToast from '../components/NotificationToast'
 import { useAuth } from '../contexts/AuthContext'
 import { subscribeToRoom, updatePlayerStatus, updatePlayerCode, flagSuspiciousActivity, resetMatch, leaveMatch, removeSpectator } from '../services/multiplayer'
 import { CHAPTER_CONTENT } from '../data/chapterContent'
@@ -35,12 +37,19 @@ function MultiplayerArena({ roomId }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [roomData, setRoomData] = useState(null)
+  
+  // Modal and notification state
+  const [showLeaveModal, setShowLeaveModal] = useState(false)
+  const [leaveModalConfig, setLeaveModalConfig] = useState({ title: '', message: '', variant: 'danger' })
+  const [pendingLeaveAction, setPendingLeaveAction] = useState(null) // 'player' or 'spectator'
+  const [notification, setNotification] = useState({ isOpen: false, message: '', type: 'info' })
   const [winner, setWinner] = useState(null)
   const [showConfetti, setShowConfetti] = useState(false)
   const [showPostMatch, setShowPostMatch] = useState(false)
   const [ratingChange, setRatingChange] = useState(null) // Store rating change data for animation
   const [oldElo, setOldElo] = useState(null)
   const [newElo, setNewElo] = useState(null)
+  const hasPushedStateRef = useRef(false) // Track if we've pushed history state for back button
   
   // Get role from navigation state or determine from room data
   const roleFromState = location.state?.role
@@ -76,6 +85,10 @@ function MultiplayerArena({ roomId }) {
               uid: winnerUid,
               ...winnerData,
             })
+            // TODO: If rating changes are needed for coding matches, calculate and set here:
+            // - Calculate rating change using calculateRatingChange from rating.js
+            // - Update user stats using updateUserStats from rating.js
+            // - Set ratingChange, oldElo, newElo state for display
             setShowConfetti(true)
             setShowPostMatch(true)
             setTimeout(() => setShowConfetti(false), 5000)
@@ -87,7 +100,7 @@ function MultiplayerArena({ roomId }) {
     return () => {
       unsubscribe()
     }
-  }, [roomId, winner])
+  }, [roomId, winner, navigate])
 
   // Get chapter data for the problem
   const problemId = roomData?.currentProblemId || '1-20'
@@ -107,22 +120,26 @@ function MultiplayerArena({ roomId }) {
     !!(currentUser?.uid && playerRecord && playerRecord.status !== 'left')
 
   // Common leave confirmation handler
-  const handleLeaveConfirm = async () => {
+  const handleLeaveConfirm = useCallback(async () => {
     if (!roomId || !currentUser?.uid) return
 
     try {
-      if (isPlayer) {
+      if (pendingLeaveAction === 'player') {
         await leaveMatch(roomId, currentUser.uid)
-      } else if (isSpectator) {
+      } else if (pendingLeaveAction === 'spectator') {
         await removeSpectator(roomId, currentUser.uid)
       }
+      setShowLeaveModal(false)
+      setPendingLeaveAction(null)
       navigate('/lobby', { replace: true })
     } catch (error) {
       console.error('Failed to leave:', error)
+      setShowLeaveModal(false)
+      setPendingLeaveAction(null)
       // Still navigate even if marking as left fails
       navigate('/lobby', { replace: true })
     }
-  }
+  }, [roomId, currentUser?.uid, pendingLeaveAction, navigate])
 
   // Warn players before leaving an active match (browser/tab close)
   useEffect(() => {
@@ -144,25 +161,44 @@ function MultiplayerArena({ roomId }) {
   useEffect(() => {
     if (!roomData || (!isPlayer && !isSpectator)) return
 
-    // Push a state to enable back button detection
-    window.history.pushState(null, '', window.location.pathname)
+    // Push a state to enable back button detection (only once per mount)
+    if (!hasPushedStateRef.current) {
+      window.history.pushState(null, '', window.location.pathname)
+      hasPushedStateRef.current = true
+    }
 
     const handlePopState = () => {
       // Only block if match is active (or even in waiting room)
-      const confirmLeave = window.confirm(
-        isPlayer
-          ? roomData.status === 'playing'
-            ? 'Are you sure you want to leave this match? You will be marked as having left and cannot rejoin as a player.'
-            : 'Are you sure you want to leave this room?'
-          : 'Are you sure you want to leave?'
-      )
-
-      if (confirmLeave) {
-        handleLeaveConfirm()
+      if (isPlayer) {
+        if (roomData.status === 'playing') {
+          setLeaveModalConfig({
+            title: 'Leave Match?',
+            message: 'Are you sure you want to leave this match?\n\nYou will be marked as having left and cannot rejoin as a player.',
+            variant: 'danger',
+          })
+          setPendingLeaveAction('player')
+          setShowLeaveModal(true)
+        } else {
+          setLeaveModalConfig({
+            title: 'Leave Room?',
+            message: 'Are you sure you want to leave this room?',
+            variant: 'warning',
+          })
+          setPendingLeaveAction('player')
+          setShowLeaveModal(true)
+        }
       } else {
-        // Push current state back to prevent navigation
-        window.history.pushState(null, '', window.location.pathname)
+        setLeaveModalConfig({
+          title: 'Leave?',
+          message: 'Are you sure you want to leave?',
+          variant: 'warning',
+        })
+        setPendingLeaveAction('spectator')
+        setShowLeaveModal(true)
       }
+
+      // Push current state back to prevent navigation
+      window.history.pushState(null, '', window.location.pathname)
     }
 
     window.addEventListener('popstate', handlePopState)
@@ -175,7 +211,7 @@ function MultiplayerArena({ roomId }) {
   // Mark player/spectator as having left when component unmounts
   useEffect(() => {
     return () => {
-      if (roomId && currentUser?.uid && roomData?.status === 'playing') {
+      if (roomId && currentUser?.uid) {
         if (isPlayer) {
           leaveMatch(roomId, currentUser.uid).catch((error) => {
             console.error('Failed to mark player as left match:', error)
@@ -289,6 +325,9 @@ function MultiplayerArena({ roomId }) {
       await resetMatch(roomId)
       setWinner(null)
       setShowPostMatch(false)
+      setRatingChange(null)
+      setOldElo(null)
+      setNewElo(null)
       // Room will reset to 'waiting' status, which will trigger navigation back to lobby
     } catch (error) {
       console.error('Failed to reset match:', error)
@@ -302,40 +341,72 @@ function MultiplayerArena({ roomId }) {
   // Handle player leaving/resigning
   const handlePlayerLeave = () => {
     const isDuringMatch = roomData?.status === 'playing'
-    const message = isDuringMatch
-      ? 'Are you sure you want to resign from this match?\n\nConsequences:\n• You will be marked as having left\n• You cannot rejoin as a player\n• Your opponent will win by default'
-      : 'Are you sure you want to leave this room?'
-    
-    const confirmLeave = window.confirm(message)
-    
-    if (confirmLeave) {
-      handleLeaveConfirm()
-    }
+    setLeaveModalConfig({
+      title: isDuringMatch ? 'Resign from Match?' : 'Leave Room?',
+      message: isDuringMatch
+        ? 'Are you sure you want to resign from this match?\n\nConsequences:\n• You will be marked as having left\n• You cannot rejoin as a player\n• Your opponent will win by default'
+        : 'Are you sure you want to leave this room?',
+      variant: 'danger',
+    })
+    setPendingLeaveAction('player')
+    setShowLeaveModal(true)
   }
 
   // Handle spectator leaving
   const handleSpectatorLeave = () => {
-    const confirmLeave = window.confirm('Are you sure you want to stop spectating?')
-    
-    if (confirmLeave) {
-      handleLeaveConfirm()
-    }
+    setLeaveModalConfig({
+      title: 'Stop Spectating?',
+      message: 'Are you sure you want to stop spectating?',
+      variant: 'warning',
+    })
+    setPendingLeaveAction('spectator')
+    setShowLeaveModal(true)
   }
+
+  // Render modal and notification globally
+  const renderModalAndNotification = () => (
+    <>
+      <ConfirmModal
+        isOpen={showLeaveModal}
+        title={leaveModalConfig.title}
+        message={leaveModalConfig.message}
+        variant={leaveModalConfig.variant}
+        confirmText={pendingLeaveAction === 'player' && roomData?.status === 'playing' ? 'Resign' : 'Confirm'}
+        cancelText="Cancel"
+        onConfirm={handleLeaveConfirm}
+        onCancel={() => {
+          setShowLeaveModal(false)
+          setPendingLeaveAction(null)
+        }}
+      />
+      <NotificationToast
+        isOpen={notification.isOpen}
+        message={notification.message}
+        type={notification.type}
+        onClose={() => setNotification({ ...notification, isOpen: false })}
+      />
+    </>
+  )
 
   if (!roomData) {
     return (
-      <div className="flex h-screen items-center justify-center bg-neutral-950 text-white">
-        <div className="text-center">
-          <p className="text-neutral-400">Loading room data...</p>
+      <>
+        {renderModalAndNotification()}
+        <div className="flex h-screen items-center justify-center bg-neutral-950 text-white">
+          <div className="text-center">
+            <p className="text-neutral-400">Loading room data...</p>
+          </div>
         </div>
-      </div>
+      </>
     )
   }
 
   // Post-Match Screen
   if (showPostMatch && winner) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center bg-neutral-950 text-white">
+      <>
+        {renderModalAndNotification()}
+        <div className="flex h-screen flex-col items-center justify-center bg-neutral-950 text-white">
         {showConfetti && (
           <Confetti
             width={window.innerWidth}
@@ -379,6 +450,7 @@ function MultiplayerArena({ roomId }) {
           </div>
         </motion.div>
       </div>
+      </>
     )
   }
 
@@ -386,10 +458,12 @@ function MultiplayerArena({ roomId }) {
   if (roomData.matchType === 'theory') {
     // Theory race view (handles both players and spectators)
     // Only show confetti for spectators when there's a winner, or in post-match screen
-    const shouldShowConfetti = (isSpectator && winner) || (showPostMatch && winner)
+    const shouldShowConfetti = ((isSpectator && winner) || (showPostMatch && winner)) && showConfetti
     
     return (
-      <div className="flex h-screen flex-col bg-neutral-950 text-white">
+      <>
+        {renderModalAndNotification()}
+        <div className="flex h-screen flex-col bg-neutral-950 text-white">
         {shouldShowConfetti && (
           <Confetti
             width={window.innerWidth}
@@ -435,6 +509,7 @@ function MultiplayerArena({ roomId }) {
           }}
         />
       </div>
+      </>
     )
   }
 
@@ -447,7 +522,9 @@ function MultiplayerArena({ roomId }) {
     const shouldShowConfetti = isSpectator && winner && showConfetti
     
     return (
-      <div className="flex h-screen flex-col bg-neutral-950 text-white">
+      <>
+        {renderModalAndNotification()}
+        <div className="flex h-screen flex-col bg-neutral-950 text-white">
         {/* Confetti - only for spectators when winner is declared */}
         {shouldShowConfetti && (
           <Confetti
@@ -579,13 +656,16 @@ function MultiplayerArena({ roomId }) {
           </div>
         </div>
       </div>
+      </>
     )
   }
 
   // PLAYER VIEW: Split Layout
   // Only show confetti in post-match screen, not during gameplay
   return (
-    <div className="flex h-screen flex-col bg-neutral-950 text-white">
+    <>
+      {renderModalAndNotification()}
+      <div className="flex h-screen flex-col bg-neutral-950 text-white">
 
       {/* Header */}
       <header className="flex flex-col gap-2 border-b border-white/10 bg-neutral-950/60 px-4 py-3 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4">
@@ -703,6 +783,7 @@ function MultiplayerArena({ roomId }) {
         </div>
       </div>
     </div>
+      </>
   )
 }
 

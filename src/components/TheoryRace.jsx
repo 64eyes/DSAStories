@@ -21,6 +21,7 @@ function TheoryRace({ roomId, roomData, onWinner, isSpectator = false }) {
   const [timeRemaining, setTimeRemaining] = useState(30) // Display value (calculated from targetTime)
   const winnerDeclaredRef = useRef(false) // Track if winner has been declared to prevent multiple calls
   const ratingUpdatedRef = useRef(false) // Track if rating has been updated to prevent multiple updates
+  const stateRestoredRef = useRef(false) // Track if state has been restored from Firebase on mount
 
   // Get win condition from room data (set during startMatch) or use default
   const winCondition = roomData?.winCondition || DEFAULT_WINNING_SCORE
@@ -34,6 +35,60 @@ function TheoryRace({ roomId, roomData, onWinner, isSpectator = false }) {
       setQuestions(roomData.gameData.questions)
     }
   }, [roomData])
+
+  // Restore player state on page reload (hydrate from Firebase)
+  useEffect(() => {
+    if (isPlayer && roomData?.players && currentUser?.uid && !stateRestoredRef.current) {
+      const playerData = roomData.players[currentUser.uid]
+      
+      if (playerData) {
+        // Restore current question index if it exists
+        if (playerData.currentQuestionIndex !== undefined && playerData.currentQuestionIndex !== null) {
+          const restoredIndex = playerData.currentQuestionIndex
+          if (restoredIndex >= 0 && restoredIndex < questions.length) {
+            setCurrentQuestionIndex(restoredIndex)
+            console.log(`State restored: question index ${restoredIndex}`)
+          }
+        }
+
+        // Restore score if it exists (from correctAnswers)
+        if (playerData.correctAnswers !== undefined) {
+          // Score is already synced via playerScores state from roomData
+          console.log(`State restored: score ${playerData.correctAnswers}`)
+        }
+
+        // Restore timer based on server startTime
+        if (roomData.startTime && roomData.matchType === 'theory') {
+          // Handle serverTimestamp: it may be an object {'.sv': 'timestamp'} initially
+          let startTimestamp = roomData.startTime
+          if (typeof startTimestamp === 'object' && startTimestamp?.['.sv'] === 'timestamp') {
+            // Server timestamp placeholder - use current time as fallback
+            startTimestamp = Date.now()
+          }
+
+          // Calculate elapsed time since match started
+          const elapsed = Date.now() - startTimestamp
+          const questionDuration = 30000 // 30 seconds per question
+          const restoredIndex = playerData.currentQuestionIndex ?? 0
+          
+          // Calculate how much time has passed on current question
+          // If player is on question N, they've spent: N * 30s + remaining time on current question
+          // For now, if more than 30s has elapsed, give them full time for current question
+          const timeOnCurrentQuestion = Math.max(0, questionDuration - (elapsed % questionDuration))
+          const target = Date.now() + timeOnCurrentQuestion
+          
+          targetTimeRef.current = target
+          setTargetTime(target)
+          console.log(`State restored: timer reset to ${Math.floor(timeOnCurrentQuestion / 1000)}s`)
+        }
+
+        stateRestoredRef.current = true
+      } else {
+        // No existing state, mark as initialized anyway
+        stateRestoredRef.current = true
+      }
+    }
+  }, [isPlayer, roomData, currentUser?.uid, questions.length])
 
   // Sync current question index for players
   useEffect(() => {

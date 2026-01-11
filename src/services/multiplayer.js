@@ -285,6 +285,7 @@ export async function submitTheoryAnswer(roomId, userId, questionId, answerIndex
 
 /**
  * Mark a player as having left an active match
+ * Implements "Victory by Forfeit" logic: if only 1 player remains active, they win automatically
  * @param {string} roomId
  * @param {string} userId
  * @returns {Promise<void>}
@@ -299,10 +300,41 @@ export async function leaveMatch(roomId, userId) {
   }
 
   try {
+    const roomRef = ref(rtdb, `rooms/${roomId}`)
+    
+    // Get current room data
+    const snapshot = await get(roomRef)
+    if (!snapshot.exists()) {
+      throw new Error('Room does not exist')
+    }
+
+    const roomData = snapshot.val()
+    const updates = {}
+
+    // Mark the leaving player as 'left' or 'resigned'
     const playerRef = ref(rtdb, `rooms/${roomId}/players/${userId}`)
-    await update(playerRef, {
-      status: 'left',
-    })
+    const playerStatus = roomData.status === 'playing' ? 'resigned' : 'left'
+    updates[`players/${userId}/status`] = playerStatus
+
+    // Victory by Forfeit: Check if match is active and if only 1 active player remains
+    if (roomData.status === 'playing' && roomData.players) {
+      // Count active players (excluding the one who is leaving)
+      const activePlayers = Object.entries(roomData.players).filter(
+        ([uid, player]) => uid !== userId && player.status !== 'left' && player.status !== 'resigned'
+      )
+
+      // If only 1 player remains active, they win by default
+      if (activePlayers.length === 1) {
+        const [remainingPlayerId, remainingPlayer] = activePlayers[0]
+        updates[`players/${remainingPlayerId}/status`] = 'success'
+        
+        // Also update room status to indicate match ended
+        updates.status = 'completed'
+      }
+    }
+
+    // Apply all updates atomically
+    await update(roomRef, updates)
   } catch (error) {
     console.error('Error leaving match:', error)
     throw new Error(`Failed to leave match: ${error.message}`)
