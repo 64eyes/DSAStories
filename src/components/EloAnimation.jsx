@@ -73,3 +73,4 @@ function EloAnimation({ oldElo, newElo, ratingChange }) {
 
 export default EloAnimation
 
+

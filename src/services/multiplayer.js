@@ -310,6 +310,31 @@ export async function leaveMatch(roomId, userId) {
 }
 
 /**
+ * Remove a spectator from a room
+ * @param {string} roomId - The room ID
+ * @param {string} userId - The user ID of the spectator to remove
+ * @returns {Promise<void>}
+ * @throws {Error} - If removal fails
+ */
+export async function removeSpectator(roomId, userId) {
+  if (!rtdb) {
+    throw new Error('Realtime Database is not initialized. Please check your Firebase configuration.')
+  }
+
+  if (!roomId || !userId) {
+    throw new Error('roomId and userId are required')
+  }
+
+  try {
+    const spectatorRef = ref(rtdb, `rooms/${roomId}/spectators/${userId}`)
+    await set(spectatorRef, null) // Remove the spectator entry
+  } catch (error) {
+    console.error('Error removing spectator:', error)
+    throw new Error(`Failed to remove spectator: ${error.message}`)
+  }
+}
+
+/**
  * Reset match state for next challenge
  * @param {string} roomId - The room ID
  * @returns {Promise<void>}

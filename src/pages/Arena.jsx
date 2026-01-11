@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Users, AlertTriangle, RotateCcw, Home } from 'lucide-react'
+import { Users, AlertTriangle, RotateCcw, Home, LogOut, X } from 'lucide-react'
 import Confetti from 'react-confetti'
 import CodeEditor from '../components/CodeEditor'
 import TheoryRace from '../components/TheoryRace'
 import EloAnimation from '../components/EloAnimation'
 import { useAuth } from '../contexts/AuthContext'
-import { subscribeToRoom, updatePlayerStatus, updatePlayerCode, flagSuspiciousActivity, resetMatch, leaveMatch } from '../services/multiplayer'
+import { subscribeToRoom, updatePlayerStatus, updatePlayerCode, flagSuspiciousActivity, resetMatch, leaveMatch, removeSpectator } from '../services/multiplayer'
 import { CHAPTER_CONTENT } from '../data/chapterContent'
 
 // Solo Mode (no roomId)
@@ -106,6 +106,24 @@ function MultiplayerArena({ roomId }) {
     !isSpectator &&
     !!(currentUser?.uid && playerRecord && playerRecord.status !== 'left')
 
+  // Common leave confirmation handler
+  const handleLeaveConfirm = async () => {
+    if (!roomId || !currentUser?.uid) return
+
+    try {
+      if (isPlayer) {
+        await leaveMatch(roomId, currentUser.uid)
+      } else if (isSpectator) {
+        await removeSpectator(roomId, currentUser.uid)
+      }
+      navigate('/lobby', { replace: true })
+    } catch (error) {
+      console.error('Failed to leave:', error)
+      // Still navigate even if marking as left fails
+      navigate('/lobby', { replace: true })
+    }
+  }
+
   // Warn players before leaving an active match (browser/tab close)
   useEffect(() => {
     if (!roomData || roomData.status !== 'playing' || !isPlayer) return
@@ -122,16 +140,54 @@ function MultiplayerArena({ roomId }) {
     }
   }, [roomData?.status, isPlayer])
 
-  // Mark player as having left when component unmounts during an active match
+  // Handle back button navigation with confirmation
   useEffect(() => {
-    return () => {
-      if (roomId && currentUser?.uid && roomData?.status === 'playing' && isPlayer) {
-        leaveMatch(roomId, currentUser.uid).catch((error) => {
-          console.error('Failed to mark player as left match:', error)
-        })
+    if (!roomData || (!isPlayer && !isSpectator)) return
+
+    // Push a state to enable back button detection
+    window.history.pushState(null, '', window.location.pathname)
+
+    const handlePopState = () => {
+      // Only block if match is active (or even in waiting room)
+      const confirmLeave = window.confirm(
+        isPlayer
+          ? roomData.status === 'playing'
+            ? 'Are you sure you want to leave this match? You will be marked as having left and cannot rejoin as a player.'
+            : 'Are you sure you want to leave this room?'
+          : 'Are you sure you want to leave?'
+      )
+
+      if (confirmLeave) {
+        handleLeaveConfirm()
+      } else {
+        // Push current state back to prevent navigation
+        window.history.pushState(null, '', window.location.pathname)
       }
     }
-  }, [roomId, currentUser?.uid, roomData?.status, isPlayer])
+
+    window.addEventListener('popstate', handlePopState)
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [roomData, isPlayer, isSpectator, roomId, currentUser?.uid, navigate])
+
+  // Mark player/spectator as having left when component unmounts
+  useEffect(() => {
+    return () => {
+      if (roomId && currentUser?.uid && roomData?.status === 'playing') {
+        if (isPlayer) {
+          leaveMatch(roomId, currentUser.uid).catch((error) => {
+            console.error('Failed to mark player as left match:', error)
+          })
+        } else if (isSpectator) {
+          removeSpectator(roomId, currentUser.uid).catch((error) => {
+            console.error('Failed to remove spectator:', error)
+          })
+        }
+      }
+    }
+  }, [roomId, currentUser?.uid, roomData?.status, isPlayer, isSpectator])
 
   // Get all active players (exclude those who left)
   const allPlayers = roomData?.players
@@ -243,6 +299,29 @@ function MultiplayerArena({ roomId }) {
     navigate(`/lobby`)
   }
 
+  // Handle player leaving/resigning
+  const handlePlayerLeave = () => {
+    const isDuringMatch = roomData?.status === 'playing'
+    const message = isDuringMatch
+      ? 'Are you sure you want to resign from this match?\n\nConsequences:\n• You will be marked as having left\n• You cannot rejoin as a player\n• Your opponent will win by default'
+      : 'Are you sure you want to leave this room?'
+    
+    const confirmLeave = window.confirm(message)
+    
+    if (confirmLeave) {
+      handleLeaveConfirm()
+    }
+  }
+
+  // Handle spectator leaving
+  const handleSpectatorLeave = () => {
+    const confirmLeave = window.confirm('Are you sure you want to stop spectating?')
+    
+    if (confirmLeave) {
+      handleLeaveConfirm()
+    }
+  }
+
   if (!roomData) {
     return (
       <div className="flex h-screen items-center justify-center bg-neutral-950 text-white">
@@ -319,6 +398,22 @@ function MultiplayerArena({ roomId }) {
             numberOfPieces={500}
           />
         )}
+        {/* Header with Leave button for Theory Race */}
+        <header className="flex items-center justify-between border-b border-white/10 bg-neutral-950/60 px-4 py-3 backdrop-blur-sm sm:px-6 sm:py-4">
+          <div>
+            <h1 className="text-lg font-bold text-white sm:text-xl">Theory Race</h1>
+            {isSpectator && (
+              <p className="mt-1 text-xs font-semibold text-yellow-400">👁️ You are watching</p>
+            )}
+          </div>
+          <button
+            onClick={isSpectator ? handleSpectatorLeave : handlePlayerLeave}
+            className="flex items-center gap-2 rounded-lg border border-red-500/50 bg-red-500/10 px-3 py-1.5 text-sm font-semibold text-red-400 transition-colors hover:bg-red-500/20 hover:border-red-500"
+          >
+            <LogOut size={16} />
+            <span>{isSpectator ? 'Leave' : roomData?.status === 'playing' ? 'Resign' : 'Leave'}</span>
+          </button>
+        </header>
         <TheoryRace
           roomId={roomId}
           roomData={roomData}
@@ -385,6 +480,13 @@ function MultiplayerArena({ roomId }) {
                 <span className="text-neutral-500">• {Object.keys(roomData.spectators).length} Spectators</span>
               )}
             </div>
+            <button
+              onClick={handleSpectatorLeave}
+              className="flex items-center gap-2 rounded-lg border border-red-500/50 bg-red-500/10 px-3 py-1.5 text-sm font-semibold text-red-400 transition-colors hover:bg-red-500/20 hover:border-red-500"
+            >
+              <LogOut size={16} />
+              <span>Leave</span>
+            </button>
           </div>
         </header>
 
@@ -498,6 +600,13 @@ function MultiplayerArena({ roomId }) {
             <Users size={14} className="sm:w-4" />
             <span>{allPlayers.length} Players</span>
           </div>
+          <button
+            onClick={handlePlayerLeave}
+            className="flex items-center gap-2 rounded-lg border border-red-500/50 bg-red-500/10 px-3 py-1.5 text-sm font-semibold text-red-400 transition-colors hover:bg-red-500/20 hover:border-red-500"
+          >
+            <X size={16} />
+            <span>{roomData?.status === 'playing' ? 'Resign' : 'Leave'}</span>
+          </button>
         </div>
       </header>
 

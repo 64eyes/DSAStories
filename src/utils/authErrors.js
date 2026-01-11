@@ -39,3 +39,4 @@ export function getAuthErrorMessage(error) {
   return errorMessages[errorCode] || `Authentication failed: ${error.message || errorCode}. Please try again.`
 }
 
+
