@@ -151,7 +151,6 @@ function Lobby() {
       
       if (matchType === 'theory') {
         // Generate questions on the host side
-        const { getRandomQuestions } = await import('../data/theoryQuestions')
         const questions = getRandomQuestions(theoryCategory, 20)
         
         gamePayload = {
