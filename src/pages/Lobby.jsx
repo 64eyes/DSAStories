@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Copy, Check, Plus, Play, Code, BookOpen, Eye } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { createRoom, joinRoom, subscribeToRoom, startMatch } from '../services/multiplayer'
-import { getCategories } from '../data/theoryQuestions'
+import { getCategories, getRandomQuestions } from '../data/theoryQuestions'
 
 function Lobby() {
   const { currentUser } = useAuth()
