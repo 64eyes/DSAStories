@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { CheckCircle2, XCircle, Clock, Trophy, Eye } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
