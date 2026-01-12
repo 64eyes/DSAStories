@@ -67,7 +67,59 @@ function MultiplayerArena({ roomId }) {
         return
       }
 
+      // Track previous player statuses to detect resignations
+      const previousPlayerStatuses = previousPlayersRef.current
+      const currentPlayerStatuses = {}
+      if (data.players) {
+        Object.entries(data.players).forEach(([uid, player]) => {
+          currentPlayerStatuses[uid] = player.status
+        })
+      }
+
+      // Check for opponent resignations and show toast
+      if (previousPlayerStatuses && isPlayer && data.players) {
+        Object.entries(data.players).forEach(([uid, player]) => {
+          if (uid !== currentUser?.uid && player.status === 'resigned') {
+            const previousStatus = previousPlayerStatuses[uid]
+            if (previousStatus !== 'resigned' && previousStatus !== 'left') {
+              // Opponent just resigned
+              setNotification({
+                isOpen: true,
+                message: `${player.displayName || 'A player'} has resigned.`,
+                type: 'info',
+              })
+            }
+          }
+        })
+      }
+
+      // Update previous player statuses
+      previousPlayersRef.current = currentPlayerStatuses
+
       setRoomData(data)
+
+      // Check for current user's victory (including victory by forfeit)
+      if (data.players && currentUser?.uid) {
+        const currentPlayer = data.players[currentUser.uid]
+        if (currentPlayer && currentPlayer.status === 'success' && !winner) {
+          // Current user won - check if it was by forfeit
+          const allOpponents = Object.entries(data.players).filter(
+            ([uid]) => uid !== currentUser.uid
+          )
+          const isForfeit = allOpponents.every(
+            ([, player]) => player.status === 'resigned' || player.status === 'left'
+          )
+
+          setWinner({
+            uid: currentUser.uid,
+            ...currentPlayer,
+            isForfeit,
+          })
+          setShowConfetti(true)
+          setShowPostMatch(true)
+          setTimeout(() => setShowConfetti(false), 5000)
+        }
+      }
 
       // Check for winner based on match type
       if (data.players) {
@@ -78,8 +130,10 @@ function MultiplayerArena({ roomId }) {
           // Match ends when all questions are answered, winner is highest score
           // This logic is handled in TheoryRace component, so we don't need to check here
         } else {
-          // Coding challenge: winner is first to success
-          const winnerPlayer = players.find(([uid, player]) => player.status === 'success')
+          // Coding challenge: winner is first to success (if not current user)
+          const winnerPlayer = players.find(
+            ([uid, player]) => player.status === 'success' && uid !== currentUser?.uid
+          )
           if (winnerPlayer && !winner) {
             const [winnerUid, winnerData] = winnerPlayer
             setWinner({
@@ -101,7 +155,7 @@ function MultiplayerArena({ roomId }) {
     return () => {
       unsubscribe()
     }
-  }, [roomId, winner, navigate])
+  }, [roomId, winner, navigate, isPlayer, currentUser?.uid])
 
   // Get chapter data for the problem
   const problemId = roomData?.currentProblemId || '1-20'
@@ -421,11 +475,21 @@ function MultiplayerArena({ roomId }) {
           animate={{ scale: 1, opacity: 1 }}
           className="w-full max-w-2xl rounded-2xl border border-yellow-500/50 bg-neutral-900 p-8 text-center shadow-2xl"
         >
-          <h1 className="mb-4 text-4xl font-bold text-yellow-400">Match Complete!</h1>
+          <h1 className="mb-4 text-4xl font-bold text-yellow-400">
+            {winner.isForfeit && winner.uid === currentUser?.uid
+              ? 'Victory by Forfeit!'
+              : 'Match Complete!'}
+          </h1>
           <p className="mb-8 text-xl text-neutral-300">
-            {winner.uid === currentUser?.uid
-              ? '🎉 Congratulations! You won!'
-              : `${winner.displayName || 'A player'} won the match!`}
+            {winner.uid === currentUser?.uid ? (
+              winner.isForfeit ? (
+                '🎉 Your opponent resigned. You win by default!'
+              ) : (
+                '🎉 Congratulations! You won!'
+              )
+            ) : (
+              `${winner.displayName || 'A player'} won the match!`
+            )}
           </p>
           
           {/* Rating Change Animation */}
