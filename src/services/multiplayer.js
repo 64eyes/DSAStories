@@ -328,8 +328,8 @@ export async function leaveMatch(roomId, userId) {
         const [remainingPlayerId, remainingPlayer] = activePlayers[0]
         updates[`players/${remainingPlayerId}/status`] = 'success'
         
-        // Also update room status to indicate match ended
-        updates.status = 'completed'
+        // Also update room status to indicate match ended (Last Man Standing)
+        updates.status = 'finished'
       }
     }
 

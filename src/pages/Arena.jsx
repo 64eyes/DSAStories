@@ -55,6 +55,29 @@ function MultiplayerArena({ roomId }) {
   // Get role from navigation state or determine from room data
   const roleFromState = location.state?.role
 
+  // Get chapter data for the problem (needed for role determination)
+  const problemId = roomData?.currentProblemId || '1-20'
+  const chapter = CHAPTER_CONTENT[problemId]
+
+  // Determine role: check navigation state first, then room data
+  // This must be defined BEFORE useEffect that uses it
+  const playerRecord =
+    currentUser?.uid && roomData?.players ? roomData.players[currentUser.uid] : null
+  const isSpectatorExplicit = roleFromState === 'spectator'
+  const isSpectatorFromRoom =
+    currentUser?.uid &&
+    roomData?.spectators?.[currentUser.uid] &&
+    (!playerRecord || playerRecord.status === 'left')
+  const isSpectator = isSpectatorExplicit || isSpectatorFromRoom
+  const isPlayer =
+    !isSpectator &&
+    !!(currentUser?.uid && playerRecord && playerRecord.status !== 'left')
+
+  // Get current player data (needed for victory checks)
+  const currentPlayer = currentUser?.uid && roomData?.players?.[currentUser.uid]
+    ? roomData.players[currentUser.uid]
+    : null
+
   // Subscribe to room updates
   useEffect(() => {
     if (!roomId) return
@@ -76,8 +99,12 @@ function MultiplayerArena({ roomId }) {
         })
       }
 
+      // Determine current player for this update
+      const myPlayer = data.players && currentUser?.uid ? data.players[currentUser.uid] : null
+      const myIsPlayer = myPlayer && myPlayer.status !== 'left' && myPlayer.status !== 'resigned'
+
       // Check for opponent resignations and show toast
-      if (previousPlayerStatuses && isPlayer && data.players) {
+      if (previousPlayerStatuses && myIsPlayer && data.players) {
         Object.entries(data.players).forEach(([uid, player]) => {
           if (uid !== currentUser?.uid && player.status === 'resigned') {
             const previousStatus = previousPlayerStatuses[uid]
@@ -98,10 +125,30 @@ function MultiplayerArena({ roomId }) {
 
       setRoomData(data)
 
+      // Last Man Standing: Check if room is finished and current user won
+      if (data.status === 'finished' && myPlayer && myPlayer.status === 'success' && !winner) {
+        // Current user won by forfeit (Last Man Standing)
+        const allOpponents = Object.entries(data.players || {}).filter(
+          ([uid]) => uid !== currentUser?.uid
+        )
+        const isForfeit = allOpponents.every(
+          ([, player]) => player.status === 'resigned' || player.status === 'left'
+        )
+
+        setWinner({
+          uid: currentUser.uid,
+          ...myPlayer,
+          isForfeit: true, // Always true for finished status
+        })
+        setShowConfetti(true)
+        setShowPostMatch(true)
+        setTimeout(() => setShowConfetti(false), 5000)
+        return // Early return to avoid duplicate winner detection
+      }
+
       // Check for current user's victory (including victory by forfeit)
-      if (data.players && currentUser?.uid) {
-        const currentPlayer = data.players[currentUser.uid]
-        if (currentPlayer && currentPlayer.status === 'success' && !winner) {
+      if (data.players && currentUser?.uid && myPlayer) {
+        if (myPlayer.status === 'success' && !winner) {
           // Current user won - check if it was by forfeit
           const allOpponents = Object.entries(data.players).filter(
             ([uid]) => uid !== currentUser.uid
@@ -112,7 +159,7 @@ function MultiplayerArena({ roomId }) {
 
           setWinner({
             uid: currentUser.uid,
-            ...currentPlayer,
+            ...myPlayer,
             isForfeit,
           })
           setShowConfetti(true)
@@ -155,24 +202,7 @@ function MultiplayerArena({ roomId }) {
     return () => {
       unsubscribe()
     }
-  }, [roomId, winner, navigate, isPlayer, currentUser?.uid])
-
-  // Get chapter data for the problem
-  const problemId = roomData?.currentProblemId || '1-20'
-  const chapter = CHAPTER_CONTENT[problemId]
-
-  // Determine role: check navigation state first, then room data
-  const playerRecord =
-    currentUser?.uid && roomData?.players ? roomData.players[currentUser.uid] : null
-  const isSpectatorExplicit = roleFromState === 'spectator'
-  const isSpectatorFromRoom =
-    currentUser?.uid &&
-    roomData?.spectators?.[currentUser.uid] &&
-    (!playerRecord || playerRecord.status === 'left')
-  const isSpectator = isSpectatorExplicit || isSpectatorFromRoom
-  const isPlayer =
-    !isSpectator &&
-    !!(currentUser?.uid && playerRecord && playerRecord.status !== 'left')
+  }, [roomId, winner, navigate, currentUser?.uid])
 
   // Common leave confirmation handler
   const handleLeaveConfirm = useCallback(async () => {
@@ -287,11 +317,6 @@ function MultiplayerArena({ roomId }) {
 
   // Get opponents (filter out current user)
   const opponents = allPlayers.filter(([uid]) => uid !== currentUser?.uid)
-
-  // Get current player data
-  const currentPlayer = currentUser?.uid && roomData?.players?.[currentUser.uid]
-    ? roomData.players[currentUser.uid]
-    : null
 
   const handleRunStart = async () => {
     if (!roomId || !currentUser?.uid) return
