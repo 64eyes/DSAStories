@@ -11,11 +11,13 @@ import {
   getDoc,
   setDoc,
 } from 'firebase/firestore'
+import { getDatabase } from 'firebase/database'
 
 // Initialize Firebase with error handling
 let app = null
 let auth = null
 let db = null
+let rtdb = null
 
 // Check if Firebase config is available before initializing
 const hasFirebaseConfig =
@@ -37,6 +39,7 @@ if (hasFirebaseConfig) {
     app = initializeApp(firebaseConfig)
     auth = getAuth(app)
     db = getFirestore(app)
+    rtdb = getDatabase(app)
   } catch (error) {
     console.error('Firebase initialization error:', error)
     // Continue without Firebase - app should still work
@@ -45,7 +48,7 @@ if (hasFirebaseConfig) {
   console.warn('Firebase config not found. Auth features will be disabled.')
 }
 
-export { auth, db }
+export { auth, db, rtdb }
 
 /**
  * Sign in with Google

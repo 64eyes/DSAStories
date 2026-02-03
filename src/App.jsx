@@ -3,6 +3,7 @@ import Navbar from './components/Navbar'
 import Home from './pages/Home'
 import Campaign from './pages/Campaign'
 import Arena from './pages/Arena'
+import Lobby from './pages/Lobby'
 import Login from './pages/Login'
 import Profile from './pages/Profile'
 import Leaderboard from './pages/Leaderboard'
@@ -30,7 +31,15 @@ function App() {
             </main>
           }
         />
-        <Route path="/arena" element={<Arena />} />
+        <Route path="/arena/:roomId?" element={<Arena />} />
+        <Route
+          path="/lobby"
+          element={
+            <ProtectedRoute>
+              <Lobby />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/login" element={<Login />} />
         <Route
           path="/profile"
