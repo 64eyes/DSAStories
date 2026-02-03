@@ -4,7 +4,9 @@ import Home from './pages/Home'
 import Campaign from './pages/Campaign'
 import Arena from './pages/Arena'
 import Login from './pages/Login'
+import Profile from './pages/Profile'
 import Leaderboard from './pages/Leaderboard'
+import ProtectedRoute from './components/ProtectedRoute'
 import './App.css'
 
 function App() {
@@ -30,6 +32,16 @@ function App() {
         />
         <Route path="/arena" element={<Arena />} />
         <Route path="/login" element={<Login />} />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <main className="mx-auto max-w-6xl px-4 pb-12 pt-24">
+                <Profile />
+              </main>
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/leaderboard"
           element={
