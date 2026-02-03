@@ -1,20 +1,21 @@
 import { initializeApp } from 'firebase/app'
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth'
 import {
-  getAuth,
-  GoogleAuthProvider,
-  signInWithPopup,
-  signOut,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-} from 'firebase/auth'
-import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore'
-import { getDatabase } from 'firebase/database'
+  getFirestore,
+  collection,
+  getDocs,
+  orderBy,
+  limit as limitDocs,
+  query,
+  doc,
+  getDoc,
+  setDoc,
+} from 'firebase/firestore'
 
 // Initialize Firebase with error handling
 let app = null
 let auth = null
 let db = null
-let rtdb = null
 
 // Check if Firebase config is available before initializing
 const hasFirebaseConfig =
@@ -31,13 +32,11 @@ if (hasFirebaseConfig) {
       storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
       messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
       appId: import.meta.env.VITE_FIREBASE_APP_ID,
-      databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
     }
 
     app = initializeApp(firebaseConfig)
     auth = getAuth(app)
     db = getFirestore(app)
-    rtdb = getDatabase(app)
   } catch (error) {
     console.error('Firebase initialization error:', error)
     // Continue without Firebase - app should still work
@@ -46,7 +45,7 @@ if (hasFirebaseConfig) {
   console.warn('Firebase config not found. Auth features will be disabled.')
 }
 
-export { auth, db, rtdb }
+export { auth, db }
 
 /**
  * Sign in with Google
@@ -61,72 +60,6 @@ export async function signInWithGoogle() {
     const result = await signInWithPopup(auth, googleProvider)
     return result
   } catch (error) {
-    throw error
-  }
-}
-
-/**
- * Sign up with email and password
- * @param {string} email
- * @param {string} password
- * @returns {Promise<UserCredential>}
- */
-export async function signUpWithEmailPassword(email, password) {
-  if (!auth) {
-    throw new Error('Firebase Auth is not initialized. Please check your Firebase configuration.')
-  }
-
-  if (!email || !password) {
-    throw new Error('Email and password are required')
-  }
-
-  try {
-    const result = await createUserWithEmailAndPassword(auth, email, password)
-
-    // Create a basic user profile document with default Elo and rank
-    if (db && result.user?.uid) {
-      const userRef = doc(db, 'users', result.user.uid)
-      await setDoc(
-        userRef,
-        {
-          email: result.user.email,
-          displayName: result.user.displayName || '',
-          elo: 1200,
-          rank: 'Novice',
-          createdAt: new Date().toISOString(),
-          lastUpdated: new Date().toISOString(),
-        },
-        { merge: true },
-      )
-    }
-
-    return result
-  } catch (error) {
-    console.error('Error signing up with email and password:', error)
-    throw error
-  }
-}
-
-/**
- * Sign in with email and password
- * @param {string} email
- * @param {string} password
- * @returns {Promise<UserCredential>}
- */
-export async function signInWithEmailPassword(email, password) {
-  if (!auth) {
-    throw new Error('Firebase Auth is not initialized. Please check your Firebase configuration.')
-  }
-
-  if (!email || !password) {
-    throw new Error('Email and password are required')
-  }
-
-  try {
-    const result = await signInWithEmailAndPassword(auth, email, password)
-    return result
-  } catch (error) {
-    console.error('Error signing in with email and password:', error)
     throw error
   }
 }
@@ -147,33 +80,9 @@ export async function logOut() {
 }
 
 /**
- * Update user profile in Firestore
- * @param {string} uid - The user's Firebase UID
- * @param {Object} data - The profile data to update (e.g., { nationality, displayName, elo, rank })
- * @returns {Promise<void>}
- */
-export async function updateUserProfile(uid, data) {
-  if (!db) {
-    throw new Error('Firestore is not initialized. Please check your Firebase configuration.')
-  }
-
-  if (!uid) {
-    throw new Error('uid is required')
-  }
-
-  try {
-    const userRef = doc(db, 'users', uid)
-    await setDoc(userRef, data, { merge: true })
-  } catch (error) {
-    console.error('Error updating user profile:', error)
-    throw new Error(`Failed to update user profile: ${error.message}`)
-  }
-}
-
-/**
  * Get user profile from Firestore
  * @param {string} uid - The user's Firebase UID
- * @returns {Promise<Object>} - User profile data with defaults if document doesn't exist
+ * @returns {Promise<Object>} - User profile data with sensible defaults
  */
 export async function getUserProfile(uid) {
   if (!db) {
@@ -186,21 +95,98 @@ export async function getUserProfile(uid) {
 
   try {
     const userRef = doc(db, 'users', uid)
-    const userDoc = await getDoc(userRef)
+    const snap = await getDoc(userRef)
 
-    if (userDoc.exists()) {
-      return userDoc.data()
-    } else {
-      // Return default profile for new users
+    if (!snap.exists()) {
+      // Default profile for new users
       return {
         elo: 1200,
         rank: 'Novice',
-        nationality: '🇺🇳',
+        wins: 0,
+        nationality: 'UN',
       }
+    }
+
+    const data = snap.data() || {}
+    return {
+      elo: typeof data.elo === 'number' ? data.elo : 1200,
+      rank: data.rank || 'Novice',
+      wins: typeof data.wins === 'number' ? data.wins : 0,
+      nationality: data.nationality || 'UN',
+      ...data,
     }
   } catch (error) {
     console.error('Error getting user profile:', error)
-    throw new Error(`Failed to get user profile: ${error.message}`)
+    throw new Error(error.message || 'Failed to load profile')
+  }
+}
+
+/**
+ * Update user profile in Firestore
+ * @param {string} uid - The user's Firebase UID
+ * @param {Object} data - Partial profile data to merge
+ */
+export async function updateUserProfile(uid, data) {
+  if (!db) {
+    throw new Error('Firestore is not initialized. Please check your Firebase configuration.')
+  }
+
+  if (!uid) {
+    throw new Error('uid is required')
+  }
+
+  try {
+    const userRef = doc(db, 'users', uid)
+    await setDoc(
+      userRef,
+      {
+        ...data,
+        lastUpdated: new Date().toISOString(),
+      },
+      { merge: true },
+    )
+  } catch (error) {
+    console.error('Error updating user profile:', error)
+    throw new Error(error.message || 'Failed to update profile')
+  }
+}
+
+/**
+ * Fetch global leaderboard from Firestore
+ * - Reads from the "users" collection
+ * - Orders by "elo" descending
+ * - Limits to top 50 (or a custom limit)
+ */
+export async function getLeaderboard(maxResults = 50) {
+  if (!db) {
+    throw new Error('Firestore is not initialized. Please check your Firebase configuration.')
+  }
+
+  try {
+    const usersRef = collection(db, 'users')
+    const q = query(usersRef, orderBy('elo', 'desc'), limitDocs(maxResults))
+    const snapshot = await getDocs(q)
+
+    if (snapshot.empty) {
+      return []
+    }
+
+    return snapshot.docs.map((doc, index) => {
+      const data = doc.data() || {}
+      return {
+        id: doc.id,
+        rank: index + 1,
+        displayName: data.displayName || 'Anonymous',
+        photoURL: data.photoURL || '',
+        nationality: data.nationality || '🇺🇳',
+        title: data.title || data.rank || 'Novice',
+        elo: typeof data.elo === 'number' ? data.elo : 1200,
+        matchesPlayed: typeof data.matchesPlayed === 'number' ? data.matchesPlayed : 0,
+      }
+    })
+  } catch (error) {
+    console.error('Error fetching leaderboard:', error)
+    throw new Error(error.message || 'Failed to load leaderboard')
   }
 }
 

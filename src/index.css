@@ -26,22 +26,3 @@ a {
   color: inherit;
   text-decoration: none;
 }
-
-/* Mobile-friendly touch targets */
-@layer utilities {
-  .touch-manipulation {
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-  }
-}
-
-/* Prevent text selection on buttons for better mobile UX */
-button, a {
-  -webkit-tap-highlight-color: transparent;
-  user-select: none;
-  }
-
-/* Improve scrolling on mobile */
-* {
-  -webkit-overflow-scrolling: touch;
-}
