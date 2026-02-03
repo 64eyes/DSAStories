@@ -135,6 +135,7 @@ function Profile() {
   const [saving, setSaving] = useState(false)
   const [selectedNationality, setSelectedNationality] = useState('UN')
   const [saveSuccess, setSaveSuccess] = useState(false)
+  const [isEditingNationality, setIsEditingNationality] = useState(false)
 
   // Load user profile on mount
   useEffect(() => {
@@ -278,47 +279,64 @@ function Profile() {
 
             {/* Nationality Selector */}
             <div>
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-neutral-400 sm:mb-3 sm:text-sm">
-                Nationality
-              </label>
-              <div className="max-h-64 space-y-2 overflow-y-auto pr-2">
-                <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6 sm:gap-2 lg:grid-cols-6">
-                  {NATIONALITIES.map((nat) => (
-                    <button
-                      key={nat.code}
-                      onClick={() => handleNationalityChange(nat.code)}
-                      disabled={saving}
-                      className={`relative flex items-center justify-center rounded-lg border p-2 transition-all active:scale-95 sm:p-2.5 ${
-                        selectedNationality === nat.code
-                          ? 'border-red-600 bg-red-600/20 shadow-[0_0_15px_rgba(220,38,38,0.5)]'
-                          : 'border-white/10 bg-neutral-800/60 hover:border-white/20 hover:bg-neutral-800/80'
-                      } ${saving ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
-                      title={nat.name}
-                    >
-                      {nat.isGlobal ? (
-                        <span className="text-2xl" role="img" aria-label={nat.name}>
-                          🌍
-                        </span>
-                      ) : (
-                        <ReactCountryFlag
-                          countryCode={nat.code}
-                          svg
-                          style={{
-                            width: '2rem',
-                            height: '2rem',
-                          }}
-                          title={nat.name}
-                        />
-                      )}
-                      {selectedNationality === nat.code && (
-                        <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600">
-                          <Save size={12} className="text-white" />
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
+              <div className="mb-2 flex items-center justify-between sm:mb-3">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 sm:text-sm">
+                  Nationality
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingNationality((prev) => !prev)}
+                  className="text-xs font-semibold text-red-400 transition-colors hover:text-red-300"
+                >
+                  {isEditingNationality ? 'Done' : 'Edit'}
+                </button>
               </div>
+
+              {isEditingNationality ? (
+                <div className="max-h-64 space-y-2 overflow-y-auto pr-2">
+                  <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6 sm:gap-2 lg:grid-cols-6">
+                    {NATIONALITIES.map((nat) => (
+                      <button
+                        key={nat.code}
+                        onClick={() => handleNationalityChange(nat.code)}
+                        disabled={saving}
+                        className={`relative flex items-center justify-center rounded-lg border p-2 transition-all active:scale-95 sm:p-2.5 ${
+                          selectedNationality === nat.code
+                            ? 'border-red-600 bg-red-600/20 shadow-[0_0_15px_rgba(220,38,38,0.5)]'
+                            : 'border-white/10 bg-neutral-800/60 hover:border-white/20 hover:bg-neutral-800/80'
+                        } ${saving ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                        title={nat.name}
+                      >
+                        {nat.isGlobal ? (
+                          <span className="text-2xl" role="img" aria-label={nat.name}>
+                            🌍
+                          </span>
+                        ) : (
+                          <ReactCountryFlag
+                            countryCode={nat.code}
+                            svg
+                            style={{
+                              width: '2rem',
+                              height: '2rem',
+                            }}
+                            title={nat.name}
+                          />
+                        )}
+                        {selectedNationality === nat.code && (
+                          <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600">
+                            <Save size={12} className="text-white" />
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-neutral-500">
+                  Use <span className="font-semibold text-red-400">Edit</span> to change your flag.
+                </p>
+              )}
+
               {saveSuccess && (
                 <p className="mt-3 text-center text-xs text-emerald-400">Nationality saved!</p>
               )}

@@ -5,7 +5,8 @@ import { logOut } from '../services/firebase'
 
 const navItems = [
   { to: '/campaign', label: 'Campaign', icon: Map },
-  { to: '/arena', label: 'Arena', icon: Crosshair },
+  // Arena entry point goes through Lobby so players can create/join rooms first
+  { to: '/lobby', label: 'Arena', icon: Crosshair },
   { to: '/leaderboard', label: 'Leaderboard', icon: BarChart3 },
 ]
 
