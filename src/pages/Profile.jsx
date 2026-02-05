@@ -135,6 +135,7 @@ function Profile() {
   const [saving, setSaving] = useState(false)
   const [selectedNationality, setSelectedNationality] = useState('UN')
   const [saveSuccess, setSaveSuccess] = useState(false)
+  const [isEditingNationality, setIsEditingNationality] = useState(false)
 
   // Load user profile on mount
   useEffect(() => {
