@@ -369,13 +369,13 @@ function Profile() {
                 <p className="mt-1 text-xs text-neutral-500">Based on performance</p>
               </div>
 
-              {/* Problems Solved */}
+              {/* Wins */}
               <div className="rounded-lg border border-white/10 bg-neutral-950/60 p-4">
                 <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-neutral-400">
-                  Problems Solved
+                  Wins
                 </p>
-                <p className="text-3xl font-bold text-red-600">{problemsSolved}</p>
-                <p className="mt-1 text-xs text-neutral-500">Chapters completed</p>
+                <p className="text-3xl font-bold text-red-600">{wins}</p>
+                <p className="mt-1 text-xs text-neutral-500">Arena victories recorded</p>
               </div>
             </div>
           </div>
