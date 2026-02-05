@@ -3,7 +3,7 @@
  * Handles real-time multiplayer game rooms using Firebase Realtime Database
  */
 
-import { ref, set, get, onValue, update, push, child, serverTimestamp, runTransaction } from 'firebase/database'
+import { ref, set, get, onValue, update, push, child, serverTimestamp } from 'firebase/database'
 import { rtdb } from './firebase'
 
 /**
@@ -84,7 +84,7 @@ export async function createRoom(hostUser) {
  * @param {string} roomId - The room ID to join
  * @param {Object} user - The Firebase user object joining the room
  * @param {string} role - The role: 'player' or 'spectator' (default: 'player')
- * @returns {Promise<{success: boolean, role: string, reason?: string}>}
+ * @returns {Promise<{success: boolean, role: string}>}
  * @throws {Error} - If room doesn't exist or join fails
  */
 export async function joinRoom(roomId, user, role = 'player') {
@@ -103,16 +103,14 @@ export async function joinRoom(roomId, user, role = 'player') {
   try {
     const roomRef = ref(rtdb, `rooms/${roomId}`)
 
+    // Check if room exists
+    const snapshot = await get(roomRef)
+
+    if (!snapshot.exists()) {
+      throw new Error('Room does not exist')
+    }
+
     if (role === 'spectator') {
-      // ---- SPECTATOR JOIN (non-transactional) ----
-      // Spectators don't affect maxPlayers, so we can keep simpler logic here
-
-      // First confirm the room exists
-      const snapshot = await get(roomRef)
-      if (!snapshot.exists()) {
-        throw new Error('Room does not exist')
-      }
-
       // If user was previously a player, mark them as left and remove from active players list
       const playerRef = ref(rtdb, `rooms/${roomId}/players/${user.uid}`)
       const playerSnapshot = await get(playerRef)
@@ -131,72 +129,19 @@ export async function joinRoom(roomId, user, role = 'player') {
 
       return { success: true, role: 'spectator' }
     } else {
-      // ---- PLAYER JOIN (transactional to avoid race conditions) ----
-
-      // Optional: pre-check that room exists to give a clearer error than a generic transaction failure
-      const snapshot = await get(roomRef)
-      if (!snapshot.exists()) {
-        throw new Error('Room does not exist')
-      }
-
-      const maxPlayersFromRoom = snapshot.val()?.maxPlayers
-      const MAX_PLAYERS_FALLBACK = 4
-
-      const transactionResult = await runTransaction(roomRef, (roomData) => {
-        // If the room was deleted between the pre-check and now, abort
-        if (roomData === null) {
-          return roomData
-        }
-
-        if (!roomData.players) {
-          roomData.players = {}
-        }
-
-        const existingPlayer = roomData.players[user.uid]
-        const maxPlayers = roomData.maxPlayers || maxPlayersFromRoom || MAX_PLAYERS_FALLBACK
-
-        // Count active players (those who haven't left/resigned)
-        const activePlayerCount = Object.values(roomData.players).filter((player) => {
-          if (!player) return false
-          return player.status !== 'left' && player.status !== 'resigned'
-        }).length
-
-        // If the user is not already a player and the room is full, don't add them
-        if (!existingPlayer && activePlayerCount >= maxPlayers) {
-          // Return the current data unchanged – transaction will still commit,
-          // but the caller can detect that the user was not added
-          return roomData
-        }
-
-        // Either (a) user is rejoining, or (b) there was room to add them
-        roomData.players[user.uid] = {
-          displayName: user.displayName || 'Anonymous',
-          photoURL: user.photoURL || '',
-          score: existingPlayer?.score ?? 0,
-          status: existingPlayer?.status && existingPlayer.status !== 'left' && existingPlayer.status !== 'resigned'
-            ? existingPlayer.status
-            : 'coding',
-          code: existingPlayer?.code ?? '',
-          progress: existingPlayer?.progress ?? 0,
-          flags: existingPlayer?.flags ?? [],
-          correctAnswers: existingPlayer?.correctAnswers ?? 0,
-          theoryAnswers: existingPlayer?.theoryAnswers ?? {},
-        }
-
-        return roomData
+      // Add user to players object (existing logic)
+      const playerRef = ref(rtdb, `rooms/${roomId}/players/${user.uid}`)
+      await set(playerRef, {
+        displayName: user.displayName || 'Anonymous',
+        photoURL: user.photoURL || '',
+        score: 0,
+        status: 'coding',
+        code: '',
+        progress: 0,
+        flags: [],
+        correctAnswers: 0,
+        theoryAnswers: {},
       })
-
-      const finalRoom = transactionResult.snapshot?.val()
-      const isNowPlayer =
-        !!finalRoom &&
-        !!finalRoom.players &&
-        !!finalRoom.players[user.uid] &&
-        finalRoom.players[user.uid].status !== 'left'
-
-      if (!isNowPlayer) {
-        // Transaction succeeded but user was not added => room was full
-        return { success: false, role: 'player', reason: 'full' }
-      }
 
       return { success: true, role: 'player' }
     }

@@ -6,9 +6,17 @@ import Arena from './pages/Arena'
 import Lobby from './pages/Lobby'
 import Login from './pages/Login'
 import Profile from './pages/Profile'
-import Leaderboard from './pages/Leaderboard'
 import ProtectedRoute from './components/ProtectedRoute'
 import './App.css'
+
+const Leaderboard = () => (
+  <div className="rounded-xl border border-white/10 bg-white/5 p-6">
+    <h1 className="text-2xl font-bold text-white">Leaderboard</h1>
+    <p className="mt-2 text-gray-300">
+      Rankings placeholder. Show global, weekly, and nationality filters here.
+    </p>
+  </div>
+)
 
 function App() {
   return (
@@ -31,7 +39,7 @@ function App() {
             </main>
           }
         />
-        <Route path="/arena/:roomId?" element={<Arena />} />
+        <Route path="/arena" element={<Arena />} />
         <Route
           path="/lobby"
           element={

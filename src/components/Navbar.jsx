@@ -5,8 +5,7 @@ import { logOut } from '../services/firebase'
 
 const navItems = [
   { to: '/campaign', label: 'Campaign', icon: Map },
-  // Arena entry point goes through Lobby so players can create/join rooms first
-  { to: '/lobby', label: 'Arena', icon: Crosshair },
+  { to: '/arena', label: 'Arena', icon: Crosshair },
   { to: '/leaderboard', label: 'Leaderboard', icon: BarChart3 },
 ]
 
@@ -47,19 +46,16 @@ function Navbar() {
 
         {currentUser ? (
           <div className="flex items-center gap-3">
-            <Link
-              to="/profile"
-              className="flex items-center gap-2 rounded-md border border-neutral-700 bg-neutral-900/60 px-2 py-1 text-xs font-semibold uppercase tracking-wider text-neutral-400 transition-colors hover:border-white/60 hover:bg-neutral-800 hover:text-white"
-              title="View Profile"
-              aria-label="View Profile"
-            >
+            <div className="flex items-center gap-2 rounded-md border border-neutral-700 bg-neutral-900/60 px-2 py-1">
               <img
                 src={currentUser.photoURL || '/default-avatar.png'}
                 alt={currentUser.displayName || 'User'}
                 className="h-8 w-8 rounded-full border border-neutral-700 object-cover"
               />
-              <span>Novice</span>
-            </Link>
+              <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+                Novice
+              </span>
+            </div>
             <button
               onClick={handleLogout}
               className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-gray-300 transition-colors hover:bg-white/5 hover:text-white"

@@ -34,6 +34,7 @@ if (hasFirebaseConfig) {
       storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
       messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
       appId: import.meta.env.VITE_FIREBASE_APP_ID,
+      databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
     }
 
     app = initializeApp(firebaseConfig)
@@ -181,7 +182,7 @@ export async function getLeaderboard(maxResults = 50) {
         rank: index + 1,
         displayName: data.displayName || 'Anonymous',
         photoURL: data.photoURL || '',
-        nationality: data.nationality || '🇺🇳',
+        nationality: data.nationality || 'UN',
         title: data.title || data.rank || 'Novice',
         elo: typeof data.elo === 'number' ? data.elo : 1200,
         matchesPlayed: typeof data.matchesPlayed === 'number' ? data.matchesPlayed : 0,

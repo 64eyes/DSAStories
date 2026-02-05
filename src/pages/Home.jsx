@@ -191,7 +191,7 @@ function Home() {
             </motion.a>
 
             <motion.a
-              href="/lobby"
+              href="/arena"
               aria-label="Enter Arena - Quick Match"
               className="group w-full max-w-xs rounded-xl border border-white/15 bg-white/5 px-6 py-4 text-center text-lg font-semibold text-white transition duration-200 hover:border-red-400/50 hover:bg-white/10"
               onMouseEnter={() => setOrdered(true)}
@@ -204,7 +204,7 @@ function Home() {
                 <ArrowRight size={18} className="text-red-300" />
               </div>
               <p className="mt-1 text-xs uppercase tracking-[0.25em] text-red-300/80">
-                Enter Lobby
+                Enter Arena
               </p>
             </motion.a>
           </div>

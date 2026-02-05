@@ -94,43 +94,23 @@ function Lobby() {
       return
     }
 
-    const roomCode = joinRoomId.trim().toUpperCase()
-
     setIsJoining(true)
     setError(null)
 
     try {
-      const result = await joinRoom(roomCode, currentUser, role)
+      const result = await joinRoom(joinRoomId.trim().toUpperCase(), currentUser, role)
 
       if (!result.success) {
-        // If room is full for players, automatically join as spectator instead
-        if (role === 'player' && result.reason === 'full') {
-          setError('Room is full! Joining as spectator...')
-
-          const spectatorResult = await joinRoom(roomCode, currentUser, 'spectator')
-
-          if (!spectatorResult.success) {
-            setError(spectatorResult.reason || 'Failed to join room as spectator')
-            return
-          }
-
-          setRoomId(roomCode)
-          navigate(`/arena/${roomCode}`, {
-            state: { role: 'spectator' },
-            replace: true,
-          })
-          return
-        }
-
-        setError(result.reason === 'full' ? 'Room is full' : 'Failed to join room')
+        setError('Failed to join room')
         return
       }
 
-      setRoomId(roomCode)
+      const roomIdToSet = joinRoomId.trim().toUpperCase()
+      setRoomId(roomIdToSet)
       
       // If joining as spectator, navigate directly to arena
       if (result.role === 'spectator') {
-        navigate(`/arena/${roomCode}`, { 
+        navigate(`/arena/${roomIdToSet}`, { 
           state: { role: 'spectator' },
           replace: true 
         })
