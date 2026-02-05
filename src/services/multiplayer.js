@@ -3,7 +3,7 @@
  * Handles real-time multiplayer game rooms using Firebase Realtime Database
  */
 
-import { ref, set, get, onValue, update, push, child, serverTimestamp } from 'firebase/database'
+import { ref, set, get, onValue, update, push, child, serverTimestamp, runTransaction } from 'firebase/database'
 import { rtdb } from './firebase'
 
 /**
@@ -128,23 +128,62 @@ export async function joinRoom(roomId, user, role = 'player') {
       })
 
       return { success: true, role: 'spectator' }
-    } else {
-      // Add user to players object (existing logic)
-      const playerRef = ref(rtdb, `rooms/${roomId}/players/${user.uid}`)
-      await set(playerRef, {
+    }
+
+    // Player join: enforce max players via transaction to avoid race conditions
+    const transactionResult = await runTransaction(roomRef, (roomData) => {
+      if (roomData === null) {
+        return roomData
+      }
+
+      if (!roomData.players) {
+        roomData.players = {}
+      }
+
+      const existingPlayer = roomData.players[user.uid]
+      const maxPlayers = roomData.maxPlayers || 4
+
+      const activeCount = Object.values(roomData.players).filter((p) => {
+        if (!p) return false
+        return p.status !== 'left' && p.status !== 'resigned'
+      }).length
+
+      if (!existingPlayer && activeCount >= maxPlayers) {
+        // Room is full, don't modify state
+        return roomData
+      }
+
+      // Add or revive player
+      roomData.players[user.uid] = {
         displayName: user.displayName || 'Anonymous',
         photoURL: user.photoURL || '',
-        score: 0,
-        status: 'coding',
-        code: '',
-        progress: 0,
-        flags: [],
-        correctAnswers: 0,
-        theoryAnswers: {},
-      })
+        score: existingPlayer?.score ?? 0,
+        status:
+          existingPlayer?.status && existingPlayer.status !== 'left' && existingPlayer.status !== 'resigned'
+            ? existingPlayer.status
+            : 'coding',
+        code: existingPlayer?.code ?? '',
+        progress: existingPlayer?.progress ?? 0,
+        flags: existingPlayer?.flags ?? [],
+        correctAnswers: existingPlayer?.correctAnswers ?? 0,
+        theoryAnswers: existingPlayer?.theoryAnswers ?? {},
+      }
 
-      return { success: true, role: 'player' }
+      return roomData
+    })
+
+    const finalRoom = transactionResult.snapshot?.val()
+    const isNowPlayer =
+      !!finalRoom &&
+      finalRoom.players &&
+      finalRoom.players[user.uid] &&
+      finalRoom.players[user.uid].status !== 'left'
+
+    if (!isNowPlayer) {
+      return { success: false, role: 'player', reason: 'full' }
     }
+
+    return { success: true, role: 'player' }
   } catch (error) {
     console.error('Error joining room:', error)
     throw new Error(`Failed to join room: ${error.message}`)
