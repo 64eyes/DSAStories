@@ -47,7 +47,10 @@ function Navbar() {
 
         {currentUser ? (
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 rounded-md border border-neutral-700 bg-neutral-900/60 px-2 py-1">
+            <Link
+              to="/profile"
+              className="flex items-center gap-2 rounded-md border border-neutral-700 bg-neutral-900/60 px-2 py-1"
+            >
               <img
                 src={currentUser.photoURL || '/default-avatar.png'}
                 alt={currentUser.displayName || 'User'}
@@ -56,7 +59,7 @@ function Navbar() {
               <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
                 Novice
               </span>
-            </div>
+            </Link>
             <button
               onClick={handleLogout}
               className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-gray-300 transition-colors hover:bg-white/5 hover:text-white"
