@@ -6,6 +6,7 @@ import Arena from './pages/Arena'
 import Lobby from './pages/Lobby'
 import Login from './pages/Login'
 import Profile from './pages/Profile'
+import ChapterPlay from './pages/ChapterPlay'
 import Leaderboard from './pages/Leaderboard'
 import ProtectedRoute from './components/ProtectedRoute'
 import './App.css'
@@ -67,6 +68,7 @@ function App() {
             </main>
           }
         />
+        <Route path="/chapter/:chapterId" element={<ChapterPlay />} />
       </Routes>
     </div>
   )

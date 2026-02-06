@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import { Lock, Play, Check } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { getUserProgress } from '../services/progress'
@@ -146,12 +146,11 @@ function CampaignNode({ region, onClick, index }) {
 }
 
 function ChapterModal({ region, onClose, unlockedChapters = [] }) {
-  const navigate = useNavigate()
-
   const handleChapterClick = (chapterIndex) => {
     if (!region) return
     const chapterId = `${region.id}-${chapterIndex + 1}`
-    navigate(`/campaign/${chapterId}`)
+    // Navigate to standalone chapter play page
+    window.location.href = `/chapter/${chapterId}`
     onClose()
   }
 
@@ -243,6 +242,7 @@ function ChapterModal({ region, onClose, unlockedChapters = [] }) {
 function Campaign() {
   const { currentUser } = useAuth()
   const location = useLocation()
+  const { chapterId } = useParams()
   const [selectedRegion, setSelectedRegion] = useState(null)
   const [regions, setRegions] = useState(REGIONS_BASE.map((r) => ({ ...r, status: 'locked' })))
   const [unlockedChapters, setUnlockedChapters] = useState([])
@@ -314,6 +314,23 @@ function Campaign() {
 
     fetchProgress()
   }, [currentUser, location.pathname]) // Refresh when navigating back to campaign page
+
+  // When landing on /campaign/:chapterId, open the corresponding region's chapter modal
+  useEffect(() => {
+    if (!chapterId) {
+      setSelectedRegion(null)
+      return
+    }
+
+    const [regionPart] = chapterId.split('-')
+    const regionId = parseInt(regionPart, 10)
+    if (!Number.isFinite(regionId)) return
+
+    const region = regions.find((r) => r.id === regionId)
+    if (region) {
+      setSelectedRegion(region)
+    }
+  }, [chapterId, regions])
 
   const lines = useMemo(() => {
     return regions.slice(0, -1).map((region, idx) => [region.position, regions[idx + 1].position])
