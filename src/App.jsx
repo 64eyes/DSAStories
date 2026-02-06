@@ -31,6 +31,14 @@ function App() {
             </main>
           }
         />
+        <Route
+          path="/campaign/:chapterId"
+          element={
+            <main className="mx-auto max-w-6xl px-4 pb-12 pt-24">
+              <Campaign />
+            </main>
+          }
+        />
         <Route path="/arena" element={<Arena />} />
         <Route
           path="/lobby"

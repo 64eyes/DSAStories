@@ -62,6 +62,22 @@ export async function signInWithGoogle() {
   try {
     const googleProvider = new GoogleAuthProvider()
     const result = await signInWithPopup(auth, googleProvider)
+
+    // Ensure we have a user profile document for leaderboard/profile
+    const user = result.user
+    if (db && user?.uid) {
+      const userRef = doc(db, 'users', user.uid)
+      await setDoc(
+        userRef,
+        {
+          displayName: user.displayName || '',
+          photoURL: user.photoURL || '',
+          email: user.email || '',
+        },
+        { merge: true },
+      )
+    }
+
     return result
   } catch (error) {
     throw error
